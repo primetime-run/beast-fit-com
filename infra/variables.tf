@@ -211,3 +211,20 @@ variable "notify_to" {
   EOT
   type        = string
 }
+
+variable "manage_dns" {
+  description = <<-EOT
+    Manage the Route 53 records for this domain from here.
+
+    FALSE today, because the hosted zone is not in this account. beast-fit.com
+    resolves through awsdns-* nameservers, so it is on Route 53 — but in
+    whichever account also runs the Lightsail WordPress instance. This account
+    has no hosted zones at all.
+
+    While false, `terraform output dns_records_to_add` prints what to create by
+    hand in the account that does hold the zone. Flip it true once the zone
+    lives here, and the records become managed instead.
+  EOT
+  type        = bool
+  default     = false
+}

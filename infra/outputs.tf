@@ -18,22 +18,52 @@ output "dkim_tokens" {
   value       = aws_sesv2_email_identity.domain.dkim_signing_attributes[0].tokens
 }
 
-output "dns_status" {
-  description = "What this stack has done to DNS."
-  value       = <<-EOT
+locals {
+  dns_managed = <<-EOT
 
-    The Route 53 zone for ${var.domain} is in this account, so the SES records
-    are managed by Terraform — nothing to type by hand:
+    Managed here. Terraform owns these, on ${var.mail_subdomain}:
 
-      3 x CNAME  DKIM, on ${var.mail_subdomain}
-      1 x TXT    SPF,  on ${var.mail_subdomain}
+      3 x CNAME  DKIM
+      1 x TXT    SPF
       1 x TXT    DMARC, p=none (report only)
 
-    All on the mail. subdomain. The root domain's own mail records are
-    untouched, so whatever handles the gym's mailbox is unaffected.
+    All on the mail. subdomain, so the root domain's own mail records are
+    untouched and the gym's mailbox is unaffected.
 
-    Pointing at GitHub Pages: ${var.point_dns_at_pages ? "YES — the apex and www now serve Pages" : "not yet (point_dns_at_pages = false)"}
+    Pointing at GitHub Pages: ${var.point_dns_at_pages ? "YES - apex and www now serve Pages" : "not yet (point_dns_at_pages = false)"}
   EOT
+
+  dns_manual = <<-EOT
+
+    NOT managed here - manage_dns is false, because the hosted zone for
+    ${var.domain} is not in this account. It resolves through awsdns-*
+    nameservers, so it is on Route 53, in whichever account also runs the
+    Lightsail instance.
+
+    Create these by hand in the account that holds the zone. Nothing sends
+    until the DKIM records exist and SES has seen them:
+
+      CNAME  <token>._domainkey.${var.mail_subdomain}  ->  <token>.dkim.amazonses.com
+             one per token, from `terraform output dkim_tokens`
+
+      TXT    ${var.mail_subdomain}
+             "v=spf1 include:amazonses.com -all"
+
+      TXT    _dmarc.${var.mail_subdomain}
+             "v=DMARC1; p=none; rua=mailto:${var.notify_to}"
+
+    Every one is on the mail. subdomain. Do NOT add SPF to the root domain: a
+    domain may publish only one SPF record, and a second makes receivers treat
+    the whole domain as permerror, breaking mail that works today.
+
+    Move the zone into this account (or add a provider alias for the one that
+    holds it) and set manage_dns = true to have Terraform own these instead.
+  EOT
+}
+
+output "dns_status" {
+  description = "DNS: either what Terraform manages, or what to create by hand."
+  value       = var.manage_dns ? local.dns_managed : local.dns_manual
 }
 
 output "next_steps" {

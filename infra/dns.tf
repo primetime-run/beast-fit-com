@@ -1,19 +1,33 @@
 # ---------------------------------------------------------------------------
 # DNS
 #
-# The hosted zone for beast-fit.com is in this same account, so the records SES
-# needs are managed here rather than typed into a console. That matters more
-# than it sounds: a mistyped DKIM token fails silently — mail simply stops
-# being signed — and the only symptom is deliverability quietly getting worse.
+# When the hosted zone is reachable from this account, the records SES needs
+# are managed here rather than typed into a console. That matters more than it
+# sounds: a mistyped DKIM token fails silently — mail simply stops being
+# signed — and the only symptom is deliverability quietly getting worse.
 #
-# The zone is looked up, not created. It already exists and holds the live
-# site's records; creating it here would mean Terraform believed it owned an
-# empty zone and would happily destroy the real one.
+# The zone is looked up, not created. It already holds the live site's records;
+# declaring it here would leave Terraform believing it owned an empty zone.
 # ---------------------------------------------------------------------------
 
+# Gated, because the zone is not in this account today.
+#
+# beast-fit.com resolves through awsdns-* nameservers, so it IS on Route 53 —
+# just in whichever account also runs the Lightsail WordPress instance. This
+# account has no hosted zones at all. Looking one up unconditionally fails the
+# plan with "no matching Route53Zone found", which reads as a Terraform bug
+# rather than what it is: DNS living somewhere else.
+#
+# Set manage_dns = true once the zone is in this account, or run this stack
+# with a provider aliased to the account that holds it.
 data "aws_route53_zone" "main" {
+  count        = var.manage_dns ? 1 : 0
   name         = "${var.domain}."
   private_zone = false
+}
+
+locals {
+  zone_id = var.manage_dns ? data.aws_route53_zone.main[0].zone_id : null
 }
 
 # --- SES -------------------------------------------------------------------
@@ -21,9 +35,9 @@ data "aws_route53_zone" "main" {
 # Three CNAMEs, one per DKIM key. for_each over the tokens rather than count,
 # so a rotation that reorders them does not destroy and recreate all three.
 resource "aws_route53_record" "dkim" {
-  for_each = toset(aws_sesv2_email_identity.domain.dkim_signing_attributes[0].tokens)
+  for_each = var.manage_dns ? toset(aws_sesv2_email_identity.domain.dkim_signing_attributes[0].tokens) : toset([])
 
-  zone_id = data.aws_route53_zone.main.zone_id
+  zone_id = local.zone_id
   name    = "${each.value}._domainkey.${var.mail_subdomain}"
   type    = "CNAME"
   ttl     = 1800
@@ -35,7 +49,8 @@ resource "aws_route53_record" "dkim" {
 # domain may only have one SPF record — a second makes receivers treat the
 # whole domain as permerror, which breaks mail that currently works.
 resource "aws_route53_record" "spf" {
-  zone_id = data.aws_route53_zone.main.zone_id
+  count   = var.manage_dns ? 1 : 0
+  zone_id = local.zone_id
   name    = var.mail_subdomain
   type    = "TXT"
   ttl     = 1800
@@ -46,7 +61,8 @@ resource "aws_route53_record" "spf" {
 # subdomain that has never sent mail is how legitimate mail lands in spam on
 # day one. Tighten once the reports show only expected sources.
 resource "aws_route53_record" "dmarc" {
-  zone_id = data.aws_route53_zone.main.zone_id
+  count   = var.manage_dns ? 1 : 0
+  zone_id = local.zone_id
   name    = "_dmarc.${var.mail_subdomain}"
   type    = "TXT"
   ttl     = 1800
@@ -69,9 +85,9 @@ resource "aws_route53_record" "dmarc" {
 # ---------------------------------------------------------------------------
 
 resource "aws_route53_record" "apex" {
-  count = var.point_dns_at_pages ? 1 : 0
+  count = var.manage_dns && var.point_dns_at_pages ? 1 : 0
 
-  zone_id         = data.aws_route53_zone.main.zone_id
+  zone_id         = local.zone_id
   name            = var.domain
   type            = "A"
   ttl             = 300 # low, so a rollback propagates in minutes rather than hours
@@ -88,9 +104,9 @@ resource "aws_route53_record" "apex" {
 }
 
 resource "aws_route53_record" "www" {
-  count = var.point_dns_at_pages ? 1 : 0
+  count = var.manage_dns && var.point_dns_at_pages ? 1 : 0
 
-  zone_id         = data.aws_route53_zone.main.zone_id
+  zone_id         = local.zone_id
   name            = "www.${var.domain}"
   type            = "CNAME"
   ttl             = 300
