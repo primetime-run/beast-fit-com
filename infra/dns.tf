@@ -1,39 +1,78 @@
 # ---------------------------------------------------------------------------
 # DNS
 #
-# When the hosted zone is reachable from this account, the records SES needs
-# are managed here rather than typed into a console. That matters more than it
-# sounds: a mistyped DKIM token fails silently — mail simply stops being
-# signed — and the only symptom is deliverability quietly getting worse.
+# The domain is REGISTERED in this account (Route 53 Domains) but its hosted
+# zone is not: the registration delegates to nameservers whose zone lives in
+# an account nobody has identified. So DNS cannot be edited from here until a
+# zone exists here and the registration points at it.
 #
-# The zone is looked up, not created. It already holds the live site's records;
-# declaring it here would leave Terraform believing it owned an empty zone.
+# manage_dns = true creates that zone, carrying the two records the live site
+# actually depends on, so switching the delegation changes nothing a visitor
+# can see. Only once that is verified should point_dns_at_pages flip.
+#
+# Sequence:
+#   1. terraform apply -var 'manage_dns=true'
+#   2. terraform output nameservers  ->  set these on the registered domain
+#      (Route 53 -> Registered domains -> beast-fit.com -> Edit name servers)
+#   3. wait for propagation, confirm beast-fit.com still serves WordPress
+#   4. terraform apply -var 'manage_dns=true' -var 'point_dns_at_pages=true'
+#
+# Step 3 is the one that gets skipped. Do not skip it: it is the difference
+# between a reversible delegation change and an outage with no known-good
+# state to go back to.
 # ---------------------------------------------------------------------------
 
-# Gated, because the zone is not in this account today.
-#
-# beast-fit.com resolves through awsdns-* nameservers, so it IS on Route 53 —
-# just in whichever account also runs the Lightsail WordPress instance. This
-# account has no hosted zones at all. Looking one up unconditionally fails the
-# plan with "no matching Route53Zone found", which reads as a Terraform bug
-# rather than what it is: DNS living somewhere else.
-#
-# Set manage_dns = true once the zone is in this account, or run this stack
-# with a provider aliased to the account that holds it.
-data "aws_route53_zone" "main" {
-  count        = var.manage_dns ? 1 : 0
-  name         = "${var.domain}."
-  private_zone = false
+resource "aws_route53_zone" "main" {
+  count   = var.manage_dns ? 1 : 0
+  name    = var.domain
+  comment = "beast-fit.com - managed by terraform"
+
+  lifecycle {
+    # Destroying this zone takes the domain off the internet entirely, rather
+    # than merely reverting a record.
+    prevent_destroy = true
+  }
 }
 
 locals {
-  zone_id = var.manage_dns ? data.aws_route53_zone.main[0].zone_id : null
+  zone_id = var.manage_dns ? aws_route53_zone.main[0].zone_id : null
 }
 
-# --- SES -------------------------------------------------------------------
+# --- what the live site depends on ------------------------------------------
+#
+# Carried across so the new zone answers exactly as the old one does. Without
+# these, repointing the nameservers resolves the domain to nothing.
+#
+# Superseded when point_dns_at_pages flips, which is why they are conditional
+# on it being false rather than simply present.
+
+resource "aws_route53_record" "legacy_apex" {
+  count = var.manage_dns && !var.point_dns_at_pages ? 1 : 0
+
+  zone_id = local.zone_id
+  name    = var.domain
+  type    = "A"
+  ttl     = 300
+  records = [var.legacy_apex_ip]
+}
+
+resource "aws_route53_record" "legacy_www" {
+  count = var.manage_dns && !var.point_dns_at_pages ? 1 : 0
+
+  zone_id = local.zone_id
+  name    = "www.${var.domain}"
+  type    = "CNAME"
+  ttl     = 300
+  records = [var.legacy_www_target]
+}
+
+# --- SES --------------------------------------------------------------------
 
 # Three CNAMEs, one per DKIM key. for_each over the tokens rather than count,
 # so a rotation that reorders them does not destroy and recreate all three.
+#
+# Until these exist the identity sits at DKIM PENDING and SES sends nothing,
+# which is the state it is in today.
 resource "aws_route53_record" "dkim" {
   for_each = var.manage_dns ? toset(aws_sesv2_email_identity.domain.dkim_signing_attributes[0].tokens) : toset([])
 
@@ -44,10 +83,10 @@ resource "aws_route53_record" "dkim" {
   records = ["${each.value}.dkim.amazonses.com"]
 }
 
-# SPF for the sending subdomain only. Deliberately NOT on the root domain:
-# whatever handles the gym's actual mailbox publishes its own SPF there, and a
-# domain may only have one SPF record — a second makes receivers treat the
-# whole domain as permerror, which breaks mail that currently works.
+# This domain publishes no SPF today and receives no mail, so there is nothing
+# to merge with. If it ever starts receiving mail, whoever sets that up must
+# MERGE amazonses into this record rather than adding a second one — a domain
+# may publish only one SPF record, and two makes receivers fail the lot.
 resource "aws_route53_record" "spf" {
   count   = var.manage_dns ? 1 : 0
   zone_id = local.zone_id
@@ -58,8 +97,8 @@ resource "aws_route53_record" "spf" {
 }
 
 # p=none: report only, enforce nothing. Starting at quarantine or reject on a
-# subdomain that has never sent mail is how legitimate mail lands in spam on
-# day one. Tighten once the reports show only expected sources.
+# domain that has never sent mail is how legitimate mail lands in spam on day
+# one. Tighten once the reports show only expected sources.
 resource "aws_route53_record" "dmarc" {
   count   = var.manage_dns ? 1 : 0
   zone_id = local.zone_id
@@ -69,29 +108,27 @@ resource "aws_route53_record" "dmarc" {
   records = ["v=DMARC1; p=none; rua=mailto:${var.notify_to}"]
 }
 
-# --- The cutover -----------------------------------------------------------
+# --- the cutover ------------------------------------------------------------
 #
-# These point the domain at GitHub Pages, and creating them takes the live
-# WordPress site offline. They are behind a flag, default false, so applying
-# this stack for the SES records alone cannot cut the site over by accident.
+# Replaces the legacy records above with GitHub Pages, taking the WordPress
+# site offline the moment it propagates. Hence its own flag and its own step.
 #
-# When ready:  terraform apply -var 'point_dns_at_pages=true'
-# To roll back: flip it false and apply — the previous records are restored
-# from what is declared below, so check them against the live values first.
+# Set the custom domain in the repository's Pages settings FIRST. DNS alone is
+# not enough: GitHub has to know the hostname belongs to that Pages site, and
+# when it does not the result is a "Site not found" page that looks exactly
+# like a DNS fault and is not.
 #
-# allow_overwrite is on because the zone already holds records at these names
-# for the current site. Without it the apply fails; with it, Terraform takes
-# ownership of them.
+# Rolling back is flipping the flag and applying — the legacy records return
+# from what is declared above. TTL 300 throughout, so that takes minutes.
 # ---------------------------------------------------------------------------
 
 resource "aws_route53_record" "apex" {
   count = var.manage_dns && var.point_dns_at_pages ? 1 : 0
 
-  zone_id         = local.zone_id
-  name            = var.domain
-  type            = "A"
-  ttl             = 300 # low, so a rollback propagates in minutes rather than hours
-  allow_overwrite = true
+  zone_id = local.zone_id
+  name    = var.domain
+  type    = "A"
+  ttl     = 300
 
   # GitHub Pages' four anycast addresses. An apex cannot be a CNAME, which is
   # why this is four A records rather than one alias.
@@ -106,10 +143,9 @@ resource "aws_route53_record" "apex" {
 resource "aws_route53_record" "www" {
   count = var.manage_dns && var.point_dns_at_pages ? 1 : 0
 
-  zone_id         = local.zone_id
-  name            = "www.${var.domain}"
-  type            = "CNAME"
-  ttl             = 300
-  allow_overwrite = true
-  records         = ["${var.github_owner}.github.io"]
+  zone_id = local.zone_id
+  name    = "www.${var.domain}"
+  type    = "CNAME"
+  ttl     = 300
+  records = ["${var.github_owner}.github.io"]
 }

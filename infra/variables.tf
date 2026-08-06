@@ -235,3 +235,24 @@ variable "manage_dns" {
   type        = bool
   default     = false
 }
+
+# ---------------------------------------------------------------------------
+# Records the live site depends on, carried into the new zone so that
+# repointing the nameservers changes nothing a visitor can see.
+#
+# Captured from live DNS on 2026-08-06. Re-check before applying if any time
+# has passed — if the WordPress host has moved, copying a stale address here
+# is how the delegation switch becomes an outage.
+# ---------------------------------------------------------------------------
+
+variable "legacy_apex_ip" {
+  description = "Current A record for the apex — the Lightsail WordPress instance."
+  type        = string
+  default     = "54.85.191.186"
+}
+
+variable "legacy_www_target" {
+  description = "Current CNAME target for www — a CloudFront distribution."
+  type        = string
+  default     = "d29euly5651axl.cloudfront.net"
+}

@@ -105,3 +105,13 @@ output "next_steps" {
        webhook and settlement. Refund it from the Merchant Interface after.
   EOT
 }
+
+output "nameservers" {
+  description = <<-EOT
+    Set these on the registered domain once the zone exists:
+      Route 53 -> Registered domains -> beast-fit.com -> Edit name servers
+
+    Empty until manage_dns is true.
+  EOT
+  value       = var.manage_dns ? aws_route53_zone.main[0].name_servers : []
+}
