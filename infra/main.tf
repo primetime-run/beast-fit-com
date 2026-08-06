@@ -206,10 +206,23 @@ data "aws_iam_policy_document" "webhook" {
   # which reads as though the sender is wrong and is not. Testing locally does
   # not catch it — a developer's own IAM user has broader rights than this
   # role, so it passes locally and fails once deployed.
+  # The From ADDRESS, not just the domain identity.
+  #
+  # SES authorises SendEmail against the identity of the address being sent
+  # from — no-reply@beast-fit.com — and an ARN for the domain does not cover a
+  # mailbox at it. Granting the domain alone fails with
+  #
+  #   not authorized to perform `ses:SendEmail' on resource
+  #   `arn:aws:ses:...:identity/no-reply@beast-fit.com'
+  #
+  # which reads as though the identity is unverified rather than unauthorised.
+  # The wildcard covers whatever local part is used without needing a policy
+  # change each time, while still being confined to this one domain.
   statement {
     actions = ["ses:SendEmail"]
     resources = [
       aws_sesv2_email_identity.domain.arn,
+      "${aws_sesv2_email_identity.domain.arn}/*",
       aws_sesv2_email_identity.recipients[var.notify_to].arn,
     ]
   }
@@ -284,10 +297,13 @@ resource "aws_iam_role_policy_attachment" "contact_logs" {
 # in the sandbox regardless of IAM. Authorisation is not what gates that; see
 # the AUTOREPLY note on the function.
 data "aws_iam_policy_document" "contact" {
+  # Same as the webhook: the From address, not only the domain. See the note
+  # on aws_iam_policy_document.webhook.
   statement {
     actions = ["ses:SendEmail"]
     resources = [
       aws_sesv2_email_identity.domain.arn,
+      "${aws_sesv2_email_identity.domain.arn}/*",
       aws_sesv2_email_identity.recipients[var.contact_to].arn,
     ]
   }
