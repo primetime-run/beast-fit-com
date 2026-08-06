@@ -181,6 +181,11 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
     height: 100dvh;
     max-height: 100dvh;
     margin: 0;
+
+    /* Not overflow:hidden. A payment form that overflows must stay reachable —
+       hiding it means a customer can see a field they cannot get to, with
+       nothing to indicate why. */
+    overflow: auto;
     display: flex;
     flex-direction: column;
   }
