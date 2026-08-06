@@ -1,0 +1,119 @@
+# ---------------------------------------------------------------------------
+# Holidays
+#
+# Each holiday is defined ONCE, by rule, with what the gym does attached to it.
+# Dates are computed for whatever years the site needs, so this file never
+# needs extending and there is nothing to regenerate.
+#
+# THE RULE  (`on:`)
+#
+#   { month: 7, day: 4 }                  a fixed calendar date
+#   { month: 11, weekday: Thu, nth: 4 }   the 4th Thursday of November
+#   { month: 5,  weekday: Mon, nth: last} the last Monday of May
+#   { after: thanksgiving, days: 1 }      relative to another holiday
+#
+#   `nth` is written out — 4 or last, never "-1". An earlier version of this
+#   data encoded Thanksgiving as "last Thursday", which is right in most years
+#   and a week late in 2028, 2029, 2034 and 2035. Spelling it out makes the
+#   difference visible, but it does not make the mistake impossible: `nth:
+#   last` is still a rule someone could write here. What catches it is
+#   scripts/verify-holidays.ts, which checks the well-known holidays against
+#   their public definitions and fails the build on a mismatch.
+#
+# WHAT THE GYM DOES
+#
+#   closed: true    no classes at all
+#   replace: [..]   these sessions INSTEAD of the normal day
+#   add: [..]       these sessions AS WELL AS the normal day
+#   (none of them)  just a label; the normal schedule runs
+#
+# ---------------------------------------------------------------------------
+
+# How many years ahead to generate. Rules are perpetual — this is only how far
+# the published calendar looks, not a limit on the data.
+horizonYears: 3
+
+holidays:
+  - id: new-years-day
+    label: "New Year's Day"
+    on: { month: 1, day: 1 }
+    closed: true
+
+  - id: mlk-day
+    label: "Dr. Martin Luther King Jr. Day"
+    on: { month: 1, weekday: Mon, nth: 3 }
+    replace:
+      - { name: "BEAST BEATDOWN: I Have a Dream Day", time: "07:00", duration: 90 }
+
+  - id: presidents-day
+    label: "Presidents Day"
+    on: { month: 2, weekday: Mon, nth: 3 }
+
+  - id: memorial-day
+    label: "Memorial Day"
+    on: { month: 5, weekday: Mon, nth: last }
+    replace:
+      - { name: "BEAST BEATDOWN: Memorial Day", time: "07:00", duration: 90 }
+
+  - id: independence-day
+    label: "Independence Day"
+    on: { month: 7, day: 4 }
+    replace:
+      - { name: "BEAST BEATDOWN: Independence Day", time: "07:00", duration: 90 }
+
+  - id: labor-day
+    label: "Labor Day"
+    on: { month: 9, weekday: Mon, nth: 1 }
+    replace:
+      - { name: "BEAST BEATDOWN: Labor Day", time: "07:00", duration: 90 }
+
+  - id: indigenous-peoples-day
+    label: "Indigenous Peoples Day"
+    on: { month: 10, weekday: Mon, nth: 2 }
+
+  - id: halloween
+    label: "Halloween"
+    on: { month: 10, day: 31 }
+
+  - id: veterans-day
+    label: "Veterans Day"
+    on: { month: 11, day: 11 }
+
+  - id: thanksgiving
+    label: "Thanksgiving Day"
+    on: { month: 11, weekday: Thu, nth: 4 }
+    closed: true
+
+  - id: black-friday
+    label: "Black Friday"
+    on: { after: thanksgiving, days: 1 }
+    replace:
+      - { name: "BEAST BEATDOWN: Turkey Burner", time: "07:00", duration: 90 }
+
+  - id: christmas-eve
+    label: "Christmas Eve"
+    on: { month: 12, day: 24 }
+    closed: true
+
+  - id: christmas-day
+    label: "Christmas Day"
+    on: { month: 12, day: 25 }
+    closed: true
+
+  - id: new-years-eve
+    label: "New Year's Eve"
+    on: { month: 12, day: 31 }
+    replace:
+      - { name: "BEAST BEATDOWN: Last Workout of the Year", time: "07:00", duration: 90 }
+
+# ---------------------------------------------------------------------------
+# One-offs: storms, maintenance, private events. These do not recur, so they
+# are the one place a literal date is the right answer. They win over any
+# holiday rule that lands on the same day.
+#
+#   2026-08-19:
+#     label: Facility maintenance
+#     closed: true
+# ---------------------------------------------------------------------------
+
+exceptions: {}

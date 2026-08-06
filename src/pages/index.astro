@@ -1,0 +1,445 @@
+---
+import { Image } from 'astro:assets'
+import Base from '../layouts/Base.astro'
+import ClassCalendarDialog from '../components/ClassCalendarDialog.astro'
+import { schedule, overrides, home, training, fromPrice, money, gymSchema } from '../lib/data'
+import { generateSchedule } from '../lib/schedule'
+import classOnTheTurf from '../assets/gallery/class-on-the-turf.jpg'
+import trainingGround from '../assets/gallery/training-ground.jpg'
+
+/*
+  The home page answers three questions in order: what is this, when can I
+  come, and what does it cost.
+
+  All copy comes from data/home.yaml so wording changes never touch this file.
+
+  "Up next" is server-rendered for twenty days and then filtered in the
+  browser, so a page that has not been rebuilt for a few days still shows
+  genuinely upcoming classes rather than yesterday's. Each entry opens the
+  same add-to-calendar dialog the schedule page uses.
+*/
+
+const DAY_ORDER = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const
+
+const buildToday = new Date().toISOString().slice(0, 10)
+const horizonEnd = new Date(Date.parse(buildToday + 'T00:00:00Z') + 20 * 86400000)
+  .toISOString()
+  .slice(0, 10)
+
+const upcoming = generateSchedule(schedule, overrides, buildToday, horizonEnd)
+  .filter((d) => !d.closed)
+  .flatMap((d) =>
+    d.sessions.map((s) => ({
+      date: d.date,
+      time: s.time,
+      name: s.name,
+      duration: s.duration,
+      classId: s.classId,
+      special: s.special,
+      label: d.label,
+    }))
+  )
+
+const fmtDay = (iso: string) =>
+  new Date(iso + 'T00:00:00Z').toLocaleDateString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC',
+  })
+
+const t12 = (hhmm: string) => {
+  const [h, m] = hhmm.split(':').map(Number)
+  return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, '0')}${h < 12 ? 'am' : 'pm'}`
+}
+
+const wdOf = (iso: string) => DAY_ORDER[(new Date(iso + 'T00:00:00Z').getUTCDay() || 7) - 1]
+
+const gallery = [
+  { src: classOnTheTurf, alt: 'A BEAST Fitness class gathered on the turf between sets, medicine balls and foam rollers at their feet.' },
+  { src: trainingGround, alt: 'The outdoor training ground: tyres, TRX straps and balance trainers set up along the field.' },
+]
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  ...gymSchema(),
+  sameAs: ['https://www.instagram.com/beast_fitness1/'],
+}
+---
+
+<Base
+  title="BEAST Fitness — Delray Beach, FL"
+  description="Group training, personal training and drop-in classes in Delray Beach, Florida. Beginner to experienced athlete."
+  jsonLd={jsonLd}
+>
+  <section class="hero">
+    {/* The visible heading here is the logo in the masthead, which is an
+        image. Search engines and screen readers still need a text <h1>, so
+        it is present but not painted. */}
+    <h1 class="sr-only">
+      BEAST Fitness — group training, personal training and drop-in classes in
+      Delray Beach, Florida
+    </h1>
+
+    <div class="home-copy">
+      {home.hero.map((p) => <p>{p}</p>)}
+    </div>
+  </section>
+
+  <!-- ----------------------------- UP NEXT ----------------------------- -->
+  <section class="panel" aria-labelledby="next-heading">
+    <div class="sec-head">
+      <h2 id="next-heading" class="brand-title">{home.headings.next}</h2>
+      <a class="sec-link" href="/schedule/">Full schedule</a>
+    </div>
+
+    <ul class="next-list" data-next-list>
+      {
+        upcoming.map((s) => (
+          <li class="next-item" data-when={`${s.date}T${s.time}`}>
+            {/* The row itself is not a link — only Add is interactive, so
+                there is one obvious target rather than a whole clickable
+                strip. The href keeps it working without JavaScript. */}
+            <div class="next-row">
+              <span class="n-when">
+                <span class="n-time">{t12(s.time)}</span>
+                <span class="n-day">{fmtDay(s.date)}</span>
+              </span>
+              <span class="n-name">
+                {s.name}
+                {s.label && <span class="n-tag">{s.label}</span>}
+              </span>
+              <span class="n-add">
+                <span class="n-flag">Next</span>
+                <a
+                  class="n-cal"
+                  href={s.special ? '/calendar/all.ics' : `/calendar/slot/${s.classId}--${wdOf(s.date)}-${s.time.replace(':', '')}.ics`}
+                  aria-label={`Add ${s.name}, ${fmtDay(s.date)} at ${t12(s.time)}, to your calendar`}
+                  data-pick
+                  data-date={s.date}
+                  data-time={s.time}
+                  data-class={s.classId}
+                  data-name={s.special ? s.name : undefined}
+                  data-dur={s.special ? String(s.duration) : undefined}
+                >
+                  Add
+                </a>
+              </span>
+            </div>
+          </li>
+        ))
+      }
+    </ul>
+
+    <p class="next-empty" data-next-empty hidden>
+      Nothing scheduled in this window. <a href="/schedule/">See the full schedule</a>.
+    </p>
+  </section>
+
+  <!-- ---------------------------- TRAINING ----------------------------- -->
+  <section class="panel" aria-labelledby="training-heading">
+    <div class="sec-head">
+      <h2 id="training-heading" class="brand-title">{home.headings.training}</h2>
+      <a class="sec-link" href="/training/">All options</a>
+    </div>
+
+    {/* Each box is a direct link to that product's own page, at the address
+        it had on WordPress. The "from" price is the cheapest option in
+        data/training.yaml, computed here, so the two can never disagree. */}
+    <ul class="options">
+      {
+        training.products.map((p) => (
+          <li class="option">
+            <a class="option-link" href={p.url}>
+              <h3>{p.name}</h3>
+              <p class="price">
+                <span class="from">from</span>
+                <span class="amount">{money(fromPrice(p))}</span>
+              </p>
+              <p class="blurb">{p.summary}</p>
+              <span class="option-go" aria-hidden="true">See options</span>
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+
+  <!-- ---------------------------- GALLERY ------------------------------ -->
+  <section class="gallery-section" aria-labelledby="gallery-heading">
+    <h2 id="gallery-heading" class="brand-title on-grass">{home.headings.gallery}</h2>
+
+    <ul class="gallery">
+      {
+        gallery.map((g) => (
+          <li>
+            <Image
+              src={g.src}
+              alt={g.alt}
+              widths={[480, 800, 1200]}
+              sizes="(min-width: 48rem) 34rem, 92vw"
+              loading="lazy"
+            />
+          </li>
+        ))
+      }
+    </ul>
+
+    {home.closing && (
+      <div class="home-copy closing">
+        <p>{home.closing}</p>
+      </div>
+    )}
+
+    <p class="follow">
+      <a class="btn ghost" href="https://www.instagram.com/beast_fitness1/" rel="noopener">
+        Follow @beast_fitness1
+      </a>
+    </p>
+  </section>
+
+  <ClassCalendarDialog />
+</Base>
+
+<script>
+  /* Show only classes still ahead of now, capped at a handful. Server-rendered
+     for twenty days so this always has something to choose from, and filtered
+     here because a static build cannot know when it is being read. */
+  const LIMIT = 6
+  const list = document.querySelector('[data-next-list]') as HTMLElement | null
+  const empty = document.querySelector('[data-next-empty]') as HTMLElement | null
+
+  if (list) {
+    const now = new Date()
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const stamp =
+      `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}` +
+      `T${pad(now.getHours())}:${pad(now.getMinutes())}`
+
+    let shown = 0
+    for (const li of Array.from(list.children) as HTMLElement[]) {
+      const ahead = (li.dataset.when as string) >= stamp
+      if (ahead && shown < LIMIT) {
+        li.hidden = false
+        if (shown === 0) li.classList.add('is-next')
+        shown++
+      } else {
+        li.hidden = true
+      }
+    }
+    if (!shown && empty) {
+      list.hidden = true
+      empty.hidden = false
+    }
+  }
+</script>
+
+<style>
+  /* ---------------------------------------------------------------------
+     Tone: squared corners, uppercase display type and a green edge that
+     lights up on interaction. It reads like signage rather than a web app,
+     which is what the Black Ops wordmark is already doing.
+
+     Every colour is a token, so the same rules hold in light and dark — the
+     accent is --green (a brand constant in both), while text and surfaces
+     follow the device.
+  --------------------------------------------------------------------- */
+
+  .hero { padding-block: 1rem 2.5rem; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--hairline);
+    box-shadow: var(--shadow);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .sec-head {
+    display: flex; flex-wrap: wrap; gap: .75rem;
+    align-items: baseline; justify-content: space-between;
+    margin-bottom: 1.1rem;
+    padding-bottom: .6rem;
+    border-bottom: 2px solid var(--hairline);
+  }
+  .sec-head h2 { font-size: 1.45rem; text-transform: uppercase; }
+
+  .sec-link {
+    font-family: var(--brand);
+    font-size: .78rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .sec-link::after { content: ' \203A'; }
+  .sec-link:hover, .sec-link:focus-visible { text-decoration: underline; }
+
+  /* --- up next --- */
+  .next-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+
+  .next-row {
+    display: grid;
+    grid-template-columns: 7.5rem 1fr auto;
+    gap: 1rem;
+    align-items: center;
+    padding: .75rem 1rem;
+    color: var(--text);
+    background: var(--surface);
+    /* A full outline as well as the accent — the row must still read as a row
+       when its background is close to the panel behind it. */
+    border: 1px solid var(--edge);
+    border-left: 3px solid var(--edge);
+  }
+
+  .n-when { display: flex; flex-direction: column; line-height: 1.15; }
+  .n-time {
+    font-family: var(--brand);
+    font-size: 1.05rem;
+    color: var(--link);
+    font-variant-numeric: tabular-nums;
+  }
+  .n-day {
+    font-size: .68rem;
+    text-transform: uppercase;
+    letter-spacing: .09em;
+    color: var(--text-muted);
+    margin-top: .15rem;
+  }
+
+  .n-name { font-weight: 600; }
+  .n-tag {
+    display: inline-block; margin-left: .5rem; padding: .1rem .45rem;
+    font-family: var(--brand); font-size: .62rem;
+    text-transform: uppercase; letter-spacing: .05em;
+    background: var(--green); color: #0a0a0a; vertical-align: middle;
+  }
+
+  .n-add { display: flex; align-items: center; gap: .5rem; }
+
+  /* The only interactive thing in the row. */
+  .n-cal {
+    font-family: var(--brand); font-size: .7rem;
+    text-transform: uppercase; letter-spacing: .07em;
+    color: var(--link);
+    text-decoration: none;
+    background: transparent;
+    border: 1px solid var(--edge);
+    padding: .3rem .7rem;
+    white-space: nowrap;
+  }
+  .n-cal:hover,
+  .n-cal:focus-visible {
+    background: var(--green);
+    border-color: var(--green);
+    color: #0a0a0a;
+  }
+
+  /* Only the soonest class shows the flag. */
+  .n-flag { display: none; }
+  .next-item.is-next .n-flag {
+    display: inline-block;
+    font-family: var(--brand); font-size: .62rem;
+    text-transform: uppercase; letter-spacing: .08em;
+    background: var(--green); color: #0a0a0a;
+    padding: .15rem .45rem;
+  }
+  .next-item.is-next .next-row {
+    border-left-color: var(--green);
+    background: color-mix(in srgb, var(--green) 10%, var(--surface));
+  }
+
+  .next-empty { color: var(--text-muted); margin: 0; }
+
+  @media (max-width: 34rem) {
+    .next-row { grid-template-columns: 1fr auto; row-gap: .35rem; padding: .7rem .8rem; }
+    .n-when { grid-column: 1; }
+    .n-name { grid-column: 1 / -1; order: 3; }
+    /* Add stays visible here — it is now the only way into the dialog. */
+    .n-add { grid-column: 2; justify-self: end; }
+  }
+
+  /* --- training options --- */
+  .options {
+    list-style: none; margin: 0; padding: 0;
+    display: grid; gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  }
+  .option {
+    background: var(--surface);
+    border: 1px solid var(--edge);
+    border-top: 3px solid var(--green);
+  }
+  .option-link {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 1.15rem 1.15rem 1.1rem;
+    text-decoration: none;
+    color: var(--text);
+  }
+  .option-link:hover,
+  .option-link:focus-visible {
+    background: color-mix(in srgb, var(--green) 12%, var(--surface));
+    color: var(--text);
+  }
+  .option h3 {
+    margin: 0 0 .6rem;
+    font-family: var(--brand);
+    font-weight: 400;
+    font-size: .95rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--text);
+  }
+  .price { margin: 0 0 .6rem; display: flex; align-items: baseline; gap: .35rem; flex-wrap: wrap; }
+  .from {
+    font-size: .62rem; text-transform: uppercase; letter-spacing: .1em;
+    color: var(--text-muted);
+  }
+  .amount {
+    font-family: var(--brand); font-size: 1.9rem; line-height: 1;
+    color: var(--link); font-variant-numeric: tabular-nums;
+  }
+  .blurb { margin: 0 0 .9rem; font-size: .87rem; color: var(--text-muted); line-height: 1.5; }
+
+  .option-go {
+    margin-top: auto;
+    font-family: var(--brand); font-size: .68rem;
+    text-transform: uppercase; letter-spacing: .07em;
+    color: var(--link);
+  }
+  .option-go::after { content: ' \203A'; }
+
+  /* --- gallery --- */
+  .gallery-section { margin-top: 3rem; }
+  .on-grass {
+    text-align: center; color: #fff;
+    text-shadow: var(--hero-halo);
+    margin-bottom: 1.25rem;
+    font-size: 1.75rem;
+    text-transform: uppercase;
+  }
+  .gallery {
+    list-style: none; margin: 0; padding: 0;
+    display: grid; gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(min(20rem, 100%), 1fr));
+  }
+  .gallery li { margin: 0; }
+  .gallery :global(img) {
+    display: block; width: 100%; height: 100%;
+    max-height: 22rem; object-fit: cover;
+    border: 1px solid var(--hairline);
+    box-shadow: var(--shadow);
+  }
+
+  /* Sits on the grass under the photographs, so it reuses the hero treatment
+     — same halo, a shade smaller so it reads as a closing line rather than a
+     second headline. */
+  .closing { margin-top: 2.25rem; }
+  .closing :global(p) { font-size: clamp(1.1rem, 3vw, 1.6rem); padding-top: 0; }
+
+  .follow { text-align: center; margin-top: 1.5rem; }
+  /* Sits on the grass rather than a surface, so it carries its own backing
+     instead of inheriting the page link colour. */
+  .follow .btn.ghost { background: rgba(10,10,10,.72); color: #fff; border-color: var(--green); }
+  .follow .btn.ghost:hover,
+  .follow .btn.ghost:focus-visible { background: var(--green); color: #0a0a0a; }
+</style>

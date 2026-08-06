@@ -1,0 +1,68 @@
+---
+import Base from '../layouts/Base.astro'
+import { training } from '../lib/data'
+
+/*
+  GitHub Pages serves this for any unmatched path. It matters more than usual
+  here: the old WordPress install published well over a thousand individual
+  class-event URLs, and none of them exist any more. Anyone arriving on one
+  should land somewhere useful rather than a dead end.
+*/
+---
+
+<Base
+  title="Page not found — BEAST Fitness"
+  description="That page does not exist. Find the class schedule, training options or contact details for BEAST Fitness in Delray Beach, Florida."
+>
+  <div class="notfound">
+    <p class="code">404</p>
+    <h1 class="brand-title">That page has moved on</h1>
+    <p class="lede">
+      It might have been an old class listing — those all live on the schedule now.
+    </p>
+
+    <ul class="ways">
+      <li><a href="/schedule/"><strong>Class schedule</strong><span>Every class, week by week</span></a></li>
+      <li><a href="/training/"><strong>Training</strong><span>Memberships, drop-in and personal training</span></a></li>
+      {training.products.map((p) => (
+        <li><a href={p.url}><strong>{p.name}</strong><span>Prices and options</span></a></li>
+      ))}
+      <li><a href="/contact/"><strong>Contact</strong><span>Ask us anything</span></a></li>
+    </ul>
+  </div>
+</Base>
+
+<style>
+  .notfound { max-width: 42rem; }
+
+  .code {
+    font-family: var(--brand);
+    font-size: clamp(3rem, 12vw, 6rem);
+    line-height: 1;
+    margin: 0;
+    color: var(--green);
+  }
+  .notfound h1 { font-size: clamp(1.5rem, 5vw, 2.25rem); text-transform: uppercase; margin: .25rem 0 .5rem; }
+  .lede { color: var(--text-muted); margin: 0 0 2rem; }
+
+  .ways { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .ways a {
+    display: grid; gap: .1rem;
+    padding: .8rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--edge);
+    border-left: 3px solid var(--edge);
+    text-decoration: none;
+    color: var(--text);
+  }
+  .ways a:hover, .ways a:focus-visible {
+    border-left-color: var(--green);
+    background: color-mix(in srgb, var(--green) 14%, var(--surface));
+  }
+  .ways strong {
+    font-family: var(--body); font-size: .8rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .06em;
+    color: var(--link);
+  }
+  .ways span { font-size: .88rem; color: var(--text-muted); }
+</style>

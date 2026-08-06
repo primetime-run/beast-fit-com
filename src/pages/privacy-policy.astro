@@ -1,0 +1,66 @@
+---
+import Base from '../layouts/Base.astro'
+import { privacyHtml } from '../lib/data'
+
+/*
+  Migrated verbatim from the WordPress page at the same address, so the
+  existing /privacy-policy/ URL keeps working.
+
+  It is reproduced as written rather than rewritten: this is the gym's legal
+  statement, not copy to edit on their behalf. Note that it describes a mobile
+  application, cookies and Google Analytics — none of which exist on this
+  site, which sets no cookies and runs no analytics at all. It should be
+  brought in line with what the site actually does; that is a decision for the
+  owner, and the note below says so plainly rather than quietly papering over
+  the mismatch.
+*/
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebPage',
+  name: 'Privacy Policy',
+  url: 'https://beast-fit.com/privacy-policy/',
+  publisher: { '@type': 'Organization', name: 'BEAST Fitness' },
+}
+---
+
+<Base
+  title="Privacy Policy — BEAST Fitness"
+  description="How BEAST Fitness handles your information."
+  jsonLd={jsonLd}
+>
+  <h1 class="brand-title page-title">Privacy Policy</h1>
+
+  <aside class="notice">
+    <p>
+      <strong>This policy is being updated.</strong> It was written for the previous
+      website and describes cookies, analytics and a mobile application. This site sets
+      no cookies and runs no analytics. The only information it collects is what you
+      type into the <a href="/contact/">contact form</a>, which is emailed to us and not
+      stored on the website.
+    </p>
+  </aside>
+
+  <div class="policy" set:html={privacyHtml} />
+</Base>
+
+<style>
+  .page-title { font-size: clamp(1.9rem, 5vw, 2.6rem); text-transform: uppercase; }
+
+  .notice {
+    margin: 1.5rem 0 2rem;
+    padding: 1rem 1.15rem;
+    background: var(--surface);
+    border: 1px solid var(--edge);
+    border-left: 3px solid var(--green);
+  }
+  .notice p { margin: 0; font-size: .92rem; }
+
+  .policy { max-width: 46rem; }
+  .policy :global(h2) { font-size: 1.2rem; margin: 2rem 0 .5rem; text-transform: uppercase; }
+  .policy :global(h3) { font-size: 1rem; margin: 1.5rem 0 .4rem; }
+  .policy :global(p) { margin: 0 0 1rem; }
+  .policy :global(ul) { margin: 0 0 1rem; padding-left: 1.25rem; }
+  .policy :global(li) { margin-bottom: .35rem; }
+  .policy :global(a) { word-break: break-word; }
+</style>

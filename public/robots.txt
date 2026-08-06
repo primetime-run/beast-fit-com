@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+
+# The calendar files are for subscribing to, not for indexing.
+Disallow: /calendar/
+
+Sitemap: https://beast-fit.com/sitemap-index.xml

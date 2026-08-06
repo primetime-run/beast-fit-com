@@ -1,0 +1,467 @@
+---
+import { schedule, overrides, SERIES_FROM, SERIES_UNTIL, location, addressLine, directions } from '../lib/data'
+import { generateSchedule } from '../lib/schedule'
+
+/*
+  The add-to-calendar dialog, shared by the schedule page and the home page.
+
+  Any element carrying `data-pick` opens it. Expected attributes:
+
+    data-time    HH:MM            required
+    data-class   class id         required
+    data-date    YYYY-MM-DD       for a specific occurrence
+    data-day     Mon..Sun         when there is no date (pattern view)
+    data-name    override name    for a holiday special
+    data-dur     minutes          for a holiday special
+
+  Anything inside an `.is-past` element is ignored.
+*/
+
+// Weekly pattern, so the dialog can describe the slot it was opened from.
+const pattern = schedule.classes.flatMap((c) =>
+  c.slots.flatMap((s) => s.times.map((t) => ({ c: c.id, n: c.name, d: c.duration, w: s.day, t })))
+)
+
+// Dates the normal pattern does not run — a browser-built single event must
+// not be offered for a day the gym is shut.
+const suppressed = generateSchedule(schedule, overrides, SERIES_FROM, SERIES_UNTIL)
+  .filter((d) => d.kind === 'closed' || d.kind === 'replaced')
+  .map((d) => d.date)
+
+// The address the browser-built single event carries, from the same source as
+// the static .ics files and the contact page.
+const place = {
+  label: `${location.name}, ${addressLine()}`,
+  title: location.name,
+  address: `${location.street}\n${location.city} ${location.state} ${location.zip}`,
+  lat: location.lat,
+  lng: location.lng,
+}
+
+const dir = directions()
+const full = addressLine()
+---
+
+<dialog data-dialog>
+  <form method="dialog">
+    <button class="x" aria-label="Close">&times;</button>
+  </form>
+  <h2 data-dlg-title></h2>
+  <p class="dlg-sub" data-dlg-sub></p>
+
+  {/* Where the class is, under what and when it is.
+
+      Static markup, not built by the script: there is one venue and it does
+      not depend on which slot was clicked. The event being added carries this
+      same address in its LOCATION field, so showing it here is a chance to
+      notice it is wrong before it is in your calendar.
+
+      Deliberately one link, not two. Wrapping the image and repeating a "Get
+      directions" link underneath would put the same destination in the tab
+      order twice; the chip on the image is the affordance, and the anchor's
+      aria-label is what gets announced. */}
+  <div class="dlg-where">
+    <a
+      class="dlg-map"
+      href={dir.google}
+      rel="noopener"
+      aria-label={`Directions to ${location.name}, ${full}, in Google Maps`}
+    >
+      {/* lazy, and it means it: the dialog is display:none until opened, so a
+          lazy image inside it has no box to intersect the viewport and is
+          never fetched by anyone who does not open it. width/height hold the
+          space so the dialog does not jump when it arrives. alt is empty
+          because the address beside it says the same thing and the link is
+          already named. */}
+      <img
+        src="/map/location-450.png"
+        width="450"
+        height="300"
+        alt=""
+        loading="lazy"
+        decoding="async"
+      />
+      <span class="dlg-map-open">Directions</span>
+    </a>
+
+    <address class="dlg-addr">
+      <span class="dlg-venue">{location.name}</span>
+      {location.street}<br />
+      {location.city}, {location.state} {location.zip}
+      {location.landmark && <span class="dlg-landmark">{location.landmark}</span>}
+    </address>
+  </div>
+
+  <div class="opts" data-dlg-opts></div>
+</dialog>
+
+<script type="application/json" data-pattern set:html={JSON.stringify(pattern)} />
+<script type="application/json" data-suppressed set:html={JSON.stringify(suppressed)} />
+<script type="application/json" data-place set:html={JSON.stringify(place)} />
+
+<script>
+  const TZID = 'America/New_York'
+  const $ = (s: string, r: ParentNode = document) => r.querySelector(s)
+
+  type Slot = { c: string; n: string; d: number; w: string; t: string }
+  const pattern: Slot[] = JSON.parse($('[data-pattern]')?.textContent || '[]')
+  const suppressed: string[] = JSON.parse($('[data-suppressed]')?.textContent || '[]')
+  const suppressedSet = new Set(suppressed)
+
+  type Place = { label: string; title: string; address: string; lat: number; lng: number }
+  const place: Place = JSON.parse($('[data-place]')?.textContent || '{}')
+
+  const DAY_NAMES: Record<string, string> = {
+    Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday',
+    Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday',
+  }
+  const DAY_ORDER = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const t12 = (hhmm: string) => {
+    const [h, m] = hhmm.split(':').map(Number)
+    return `${h % 12 === 0 ? 12 : h % 12}:${pad(m)} ${h < 12 ? 'AM' : 'PM'}`
+  }
+  const isoOf = (t: number) => new Date(t).toISOString().slice(0, 10)
+  const wdOf = (d: string) => DAY_ORDER[(new Date(d + 'T00:00:00Z').getUTCDay() || 7) - 1]
+  const pretty = (d: string) =>
+    new Date(d + 'T00:00:00Z').toLocaleDateString('en-US', {
+      weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC',
+    })
+
+  /** First occurrence of a weekday from today that the gym is actually open. */
+  function nextDate(weekday: string) {
+    let t = Date.parse(new Date().toISOString().slice(0, 10) + 'T00:00:00Z')
+    for (let i = 0; i < 800; i++, t += 86400000) {
+      const d = isoOf(t)
+      if (wdOf(d) === weekday && !suppressedSet.has(d)) return d
+    }
+    return isoOf(t)
+  }
+
+  /* --- single-event .ics, built in the browser -------------------------
+     Only ever used for one specific occurrence. Recurring options link to
+     files generated at build time instead, because on iOS Safari a blob with
+     a download attribute frequently opens as text or silently does nothing,
+     while a served text/calendar URL opens Calendar's preview sheet.
+  --------------------------------------------------------------------- */
+  const esc = (s: string) =>
+    s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n')
+
+  function fold(line: string) {
+    const b = new TextEncoder().encode(line)
+    if (b.length <= 75) return line
+    const dec = new TextDecoder()
+    const out: string[] = []
+    let start = 0, limit = 75
+    while (start < b.length) {
+      let end = Math.min(start + limit, b.length)
+      while (end > start && end < b.length && (b[end] & 0xc0) === 0x80) end--
+      out.push(dec.decode(b.slice(start, end)))
+      start = end
+      limit = 74
+    }
+    return out[0] + out.slice(1).map((s) => '\r\n ' + s).join('')
+  }
+
+  const VTIMEZONE = [
+    'BEGIN:VTIMEZONE', `TZID:${TZID}`,
+    'BEGIN:DAYLIGHT', 'TZOFFSETFROM:-0500', 'TZOFFSETTO:-0400', 'TZNAME:EDT',
+    'DTSTART:19700308T020000', 'RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU', 'END:DAYLIGHT',
+    'BEGIN:STANDARD', 'TZOFFSETFROM:-0400', 'TZOFFSETTO:-0500', 'TZNAME:EST',
+    'DTSTART:19701101T020000', 'RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU', 'END:STANDARD',
+    'END:VTIMEZONE',
+  ]
+
+  const stampOf = (d: string, t: string) => d.replace(/-/g, '') + 'T' + t.replace(':', '') + '00'
+  function plus(d: string, t: string, mins: number) {
+    const [h, m] = t.split(':').map(Number)
+    const tot = h * 60 + m + mins
+    const shift = Math.floor(tot / 1440)
+    const mm = ((tot % 1440) + 1440) % 1440
+    return stampOf(isoOf(Date.parse(d + 'T00:00:00Z') + shift * 86400000),
+      `${pad(Math.floor(mm / 60))}:${pad(mm % 60)}`)
+  }
+
+  function downloadSingle(date: string, time: string, dur: number, name: string) {
+    const now = new Date().toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z'
+    const lines = [
+      'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//BEAST Fitness//Schedule//EN',
+      'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+      `X-WR-CALNAME:${esc(name)}`, `X-WR-TIMEZONE:${TZID}`,
+      ...VTIMEZONE,
+      'BEGIN:VEVENT',
+      `UID:one-${date}-${time.replace(':', '')}@beast-fit.com`,
+      `DTSTAMP:${now}`,
+      `DTSTART;TZID=${TZID}:${stampOf(date, time)}`,
+      `DTEND;TZID=${TZID}:${plus(date, time, dur)}`,
+      `SUMMARY:${esc(name)}`,
+      // Same three forms the static .ics files use: the display string, RFC
+      // 5545 coordinates, and the Apple property that turns a calendar entry
+      // into a map with directions rather than a re-geocoded guess.
+      `LOCATION:${esc(place.label)}`,
+      `GEO:${place.lat};${place.lng}`,
+      `X-APPLE-STRUCTURED-LOCATION;VALUE=URI;X-ADDRESS="${place.address.replace(/\n/g, '\\n')}";` +
+        `X-APPLE-RADIUS=100;X-TITLE="${place.title}":geo:${place.lat},${place.lng}`,
+      'END:VEVENT', 'END:VCALENDAR',
+    ]
+    const blob = new Blob([lines.map(fold).join('\r\n') + '\r\n'], {
+      type: 'text/calendar;charset=utf-8',
+    })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `beast-fit-${date}.ics`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+
+  /** Google Calendar prefilled-event URL. Opens the app on mobile, and is the
+   *  most reliable single-event path on iOS where blobs are unreliable. */
+  function googleUrl(date: string, time: string, dur: number, name: string) {
+    const s = stampOf(date, time)
+    const e = plus(date, time, dur)
+    const p = new URLSearchParams({
+      action: 'TEMPLATE',
+      text: name,
+      dates: `${s}/${e}`,
+      ctz: TZID,
+      location: place.label,
+    })
+    return `https://calendar.google.com/calendar/render?${p}`
+  }
+
+  const slotFile = (classId: string, day: string, time: string) =>
+    `/calendar/slot/${classId}--${day}-${time.replace(':', '')}.ics`
+  const timeFile = (time: string) => `/calendar/time/${time.replace(':', '')}.ics`
+  // Subscribing keeps the member's calendar in step with schedule changes,
+  // instead of copying today's version into it once.
+  const webcal = (path: string) => `webcal://${location.host}${path}`
+
+  /* --- the dialog ------------------------------------------------------ */
+  const dlg = $('[data-dialog]') as HTMLDialogElement | null
+
+  function openFor(el: HTMLElement) {
+    if (!dlg) return
+    const time = el.dataset.time!
+    const classId = el.dataset.class!
+    const date = el.dataset.date
+    const weekday = date ? wdOf(date) : el.dataset.day!
+
+    const special = el.dataset.name
+    const slot = pattern.find((p) => p.c === classId && p.w === weekday && p.t === time)
+    const name = special ?? slot?.n ?? 'Class'
+    const dur = special ? Number(el.dataset.dur) : (slot?.d ?? 60)
+
+    ;($('[data-dlg-title]') as HTMLElement).textContent = name
+    ;($('[data-dlg-sub]') as HTMLElement).textContent =
+      `${t12(time)} · ${dur} minutes${date ? ' · ' + pretty(date) : ' · ' + DAY_NAMES[weekday]}`
+
+    const opts = $('[data-dlg-opts]') as HTMLElement
+    opts.replaceChildren()
+
+    const row = (label: string, hint: string, actions: { text: string; href?: string; on?: () => void }[]) => {
+      const wrap = document.createElement('div')
+      wrap.className = 'opt'
+      const t = document.createElement('strong'); t.textContent = label
+      const h = document.createElement('span'); h.textContent = hint
+      const bar = document.createElement('div'); bar.className = 'opt-actions'
+      for (const a of actions) {
+        const b = document.createElement(a.href ? 'a' : 'button') as HTMLAnchorElement & HTMLButtonElement
+        b.className = 'opt-btn'
+        b.textContent = a.text
+        if (a.href) {
+          b.href = a.href
+          if (!a.href.startsWith('webcal:') && !a.href.startsWith('https://calendar.google')) {
+            b.setAttribute('download', '')
+          }
+          if (a.href.startsWith('https://')) b.rel = 'noopener'
+        } else {
+          b.type = 'button'
+          b.addEventListener('click', () => { a.on?.(); dlg!.close() })
+        }
+        bar.appendChild(b)
+      }
+      wrap.append(t, h, bar)
+      opts.appendChild(wrap)
+    }
+
+    // 1. one occurrence
+    const one = date ?? nextDate(weekday)
+    row(
+      date ? 'Just this class' : 'Just the next one',
+      `${pretty(one)} at ${t12(time)}`,
+      [
+        { text: 'Google Calendar', href: googleUrl(one, time, dur, name) },
+        { text: 'Download .ics', on: () => downloadSingle(one, time, dur, name) },
+      ]
+    )
+
+    if (!special && slot) {
+      // 2. this class, this weekday, every week
+      const f = slotFile(classId, weekday, time)
+      row(
+        `Every ${DAY_NAMES[weekday]}`,
+        `${name} at ${t12(time)} — holiday closures already excluded`,
+        [
+          { text: 'Subscribe', href: webcal(f) },
+          { text: 'Download .ics', href: f },
+        ]
+      )
+
+      // 3. that time slot across the week
+      const sameTime = pattern.filter((p) => p.t === time)
+      if (sameTime.length > 1) {
+        const days = sameTime.map((p) => p.w).sort((a, b) => DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b))
+        const tf = timeFile(time)
+        row(
+          `Every class at ${t12(time)}`,
+          `${days.join(', ')} — whatever is on at that time`,
+          [
+            { text: 'Subscribe', href: webcal(tf) },
+            { text: 'Download .ics', href: tf },
+          ]
+        )
+      }
+    }
+
+    dlg.showModal()
+  }
+
+  /* Backdrop click closes. ::backdrop is not its own element, so those clicks
+     land on the dialog — but so do clicks on its padding. Comparing against
+     the box tells them apart. */
+  dlg?.addEventListener('click', (e) => {
+    if (e.target !== dlg) return
+    const r = dlg.getBoundingClientRect()
+    const inside =
+      e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom
+    if (!inside) dlg.close()
+  })
+
+  document.addEventListener('click', (e) => {
+    const el = (e.target as HTMLElement).closest('[data-pick]') as HTMLElement | null
+    if (!el) return
+    e.preventDefault()
+    // A class that already happened is not something you can add.
+    if (el.closest('.is-past')) return
+    openFor(el)
+  })
+</script>
+
+<style is:global>
+  dialog[data-dialog] {
+    border: 1px solid var(--green);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+    padding: 1.5rem;
+    max-width: 32rem;
+    width: calc(100% - 2rem);
+    box-shadow: var(--shadow);
+  }
+  dialog[data-dialog]::backdrop { background: rgba(0, 0, 0, 0.6); }
+  dialog[data-dialog] h2 { font-size: 1.3rem; margin: 0 0 0.25rem; color: var(--link); }
+  dialog[data-dialog] .dlg-sub { margin: 0 0 0.9rem; color: var(--text-muted); font-size: 0.9rem; }
+
+  /* --- where ---
+     Map beside the address, stacking under it on narrow phones. The map is
+     given a fixed basis rather than a fraction so the address never gets
+     squeezed to one word per line. */
+  dialog[data-dialog] .dlg-where {
+    display: flex;
+    gap: 0.9rem;
+    align-items: flex-start;
+    margin: 0 0 1.25rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  dialog[data-dialog] .dlg-map {
+    position: relative;
+    display: block;
+    flex: 0 0 9rem;
+    border: 1px solid var(--edge);
+    line-height: 0;
+  }
+  dialog[data-dialog] .dlg-map img { display: block; width: 100%; height: auto; }
+
+  dialog[data-dialog] .dlg-map-open {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    font-family: var(--body);
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    background: var(--green);
+    color: #0a0a0a;
+    padding: 0.2rem 0.45rem;
+    line-height: 1.4;
+  }
+  dialog[data-dialog] .dlg-map:hover .dlg-map-open,
+  dialog[data-dialog] .dlg-map:focus-visible .dlg-map-open {
+    background: var(--green-bright);
+  }
+
+  dialog[data-dialog] .dlg-addr {
+    font-style: normal;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--text-muted);
+  }
+  dialog[data-dialog] .dlg-venue {
+    display: block;
+    font-weight: 700;
+    color: var(--text);
+  }
+  /* The field is set back from the road — this is the line that actually gets
+     people there, so it keeps the green edge it has on the contact page. */
+  dialog[data-dialog] .dlg-landmark {
+    display: block;
+    margin-top: 0.4rem;
+    padding-left: 0.55rem;
+    border-left: 3px solid var(--green);
+    font-size: 0.78rem;
+  }
+
+  /* Narrower map rather than a stacked one. Stacking is the reflex here and it
+     is wrong: a full-width map on a phone is ~200px tall and pushes the
+     add-to-calendar buttons — the entire point of this dialog — below the
+     fold. Side by side, the block stays about the height of the address. */
+  @media (max-width: 26rem) {
+    dialog[data-dialog] .dlg-where { gap: 0.7rem; }
+    dialog[data-dialog] .dlg-map { flex-basis: 6.5rem; }
+    dialog[data-dialog] .dlg-addr { font-size: 0.8rem; }
+    dialog[data-dialog] .dlg-landmark { font-size: 0.72rem; }
+  }
+  dialog[data-dialog] .x {
+    float: right; background: transparent; border: 0; color: var(--text-muted);
+    font-size: 1.5rem; line-height: 1; cursor: pointer; padding: 0;
+  }
+  dialog[data-dialog] .opts { display: grid; gap: 0.5rem; }
+  dialog[data-dialog] .opt {
+    display: grid; gap: 0.3rem; text-align: left;
+    background: var(--surface-2); border: 1px solid var(--hairline);
+    border-radius: 4px; padding: 1rem;
+  }
+  dialog[data-dialog] .opt strong { font-family: var(--display); font-weight: 700; font-size: 1rem; }
+  dialog[data-dialog] .opt > span { color: var(--text-muted); font-size: 0.82rem; }
+  dialog[data-dialog] .opt-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.4rem; }
+  dialog[data-dialog] .opt-btn {
+    font: inherit; font-size: 0.85rem; font-weight: 700;
+    background: var(--green); color: #0a0a0a; text-decoration: none;
+    border: 1px solid var(--green); border-radius: 4px;
+    padding: 0.45rem 0.8rem; cursor: pointer;
+  }
+  dialog[data-dialog] .opt-btn + .opt-btn {
+    background: transparent; color: var(--link); border-color: currentColor;
+  }
+  dialog[data-dialog] .opt-btn:hover,
+  dialog[data-dialog] .opt-btn:focus-visible {
+    background: var(--green-bright); color: #0a0a0a; border-color: var(--green-bright);
+  }
+</style>

@@ -1,0 +1,67 @@
+---
+/*
+  Accept Hosted IFrame communicator.
+
+  Authorize.Net's payment iframe cannot talk to our page directly — different
+  origins. Instead it loads THIS page inside itself and appends messages to
+  the URL fragment. Because this page is served from our origin, it can
+  postMessage up to the parent window, which is the only channel out.
+
+  Two things make this page look broken when they are wrong, and both fail
+  silently:
+
+    1. It must be on the SAME origin as the checkout page. A different host —
+       including www vs apex — and the browser drops the message. The lightbox
+       then sits there with a spinner and nothing in the console.
+    2. Its URL must match hostedPaymentIFrameCommunicatorUrl exactly, the one
+       sent when the token is minted. See infra/lambda/index.mjs.
+
+  It renders nothing. No layout, no styles, no analytics — it is a pipe.
+*/
+
+export const prerender = true
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Payment communicator</title>
+    <meta name="robots" content="noindex, nofollow" />
+  </head>
+  <body>
+    <script is:inline>
+      /* Relay to the grandparent: this page sits inside the Authorize.Net
+         iframe, which sits inside our checkout page. Hence parent.parent.
+
+         The target origin is this page's own origin — the checkout page is on
+         the same host by requirement, so we never post to '*'. Posting to '*'
+         here would broadcast transaction responses to whatever happens to be
+         framing us. */
+      ;(function () {
+        var target = window.location.protocol + '//' + window.location.host
+
+        function relay(data) {
+          if (typeof data === 'string' && data.length > 0) {
+            window.parent.parent.postMessage(data, target)
+          }
+        }
+
+        /* Authorize.Net signals in two ways depending on the event, so both
+           are handled: a postMessage into this frame, and a fragment on our
+           own URL that it sets by navigating us. */
+        window.addEventListener(
+          'message',
+          function (e) {
+            if (e && e.data) relay(e.data)
+          },
+          false
+        )
+
+        if (window.location.hash && window.location.hash.length > 1) {
+          relay(window.location.hash.substring(1))
+        }
+      })()
+    </script>
+  </body>
+</html>

@@ -1,0 +1,224 @@
+---
+import Base from '../layouts/Base.astro'
+import { training, fromPrice, money, type Product } from '../lib/data'
+import { optionKey } from '../lib/option-key.mjs'
+import CheckoutLightbox from '../components/CheckoutLightbox.astro'
+
+/*
+  One page per product, at the address it had on WordPress:
+
+    /membership-plans/    /drop-in/    /personal-training/
+
+  Routes come from the `url` field in data/training.yaml rather than from a
+  slug, which is what keeps those inbound links alive. Astro matches static
+  routes first, so /schedule/ and /training/ are unaffected by this catch-all.
+*/
+
+export function getStaticPaths() {
+  return training.products.map((p) => ({
+    // "/membership-plans/" -> "membership-plans"
+    params: { product: p.url.replace(/^\/|\/$/g, '') },
+    props: { product: p },
+  }))
+}
+
+const { product } = Astro.props as { product: Product }
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Product',
+  name: product.name,
+  description: product.summary,
+  url: `https://beast-fit.com${product.url}`,
+  brand: { '@type': 'Brand', name: 'BEAST Fitness' },
+  offers: product.options.map((o) => ({
+    '@type': 'Offer',
+    name: o.label,
+    price: o.price,
+    priceCurrency: 'USD',
+    availability: 'https://schema.org/InStock',
+  })),
+}
+---
+
+<Base
+  title={`${product.name} — BEAST Fitness`}
+  description={product.summary}
+  jsonLd={jsonLd}
+  width="wide"
+>
+  <p class="crumb"><a href="/training/">Training</a></p>
+
+  <div class="head">
+    <h1 class="brand-title">{product.name}</h1>
+    <p class="from-line">
+      <span class="from">from</span>
+      <span class="amount">{money(fromPrice(product))}</span>
+    </p>
+  </div>
+
+  {/* Two columns from tablet up: the prose and calls to action stay put on
+      the left while the price list fills the right, instead of the reader
+      scrolling past a narrow ribbon of text on a wide screen. */}
+  <div class="layout">
+    <div class="col-about">
+      <p class="description">{product.description}</p>
+
+      <div class="actions">
+        {/* Carries the topic so the contact form arrives pre-selected. */}
+        <a class="btn" href={`/contact/?topic=${product.id}`}>Ask about {product.name}</a>
+        <a class="btn ghost" href="/schedule/">See the schedule</a>
+      </div>
+
+      <p class="note">
+        Prices carried over from the previous site and may have changed —
+        please confirm with us before you commit.
+      </p>
+    </div>
+
+    <div class="col-options">
+      <h2 class="brand-title sub">Options</h2>
+      {/* A real table, because this IS tabular data — option, price, action —
+          and the three columns should line up down the list. The header row is
+          visually hidden: sighted readers get it from the layout, screen
+          readers need it announced per cell. */}
+      <table class="options">
+        <thead class="sr-only">
+          <tr>
+            <th scope="col">Option</th>
+            <th scope="col">Price</th>
+            <th scope="col">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {
+            product.options.map((o) => (
+              <tr class={o.highlight ? 'is-highlight' : undefined}>
+                <th scope="row" class="o-label">
+                  {o.label}
+                  {o.note && <span class="o-note">{o.note}</span>}
+                </th>
+                <td class="o-price">
+                  {o.was && <s class="o-was">{money(o.was)}</s>}
+                  {money(o.price)}
+                </td>
+                <td class="o-action">
+                  {/* Carries catalog keys, never a price — the server resolves
+                      the amount. Key comes from the same module the catalog
+                      generator uses, so the two cannot drift. */}
+                  <button
+                    type="button"
+                    class="o-buy"
+                    data-buy
+                    data-product={product.id}
+                    data-option={optionKey(o.label)}
+                    aria-label={`Buy ${product.name}, ${o.label}, ${money(o.price)}`}
+                  >
+                    Buy
+                  </button>
+                </td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <CheckoutLightbox />
+</Base>
+
+<style>
+  .crumb { margin: 0 0 .75rem; font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; }
+  .crumb a { text-decoration: none; }
+  .crumb a::before { content: '\2039  '; }
+  .crumb a:hover { text-decoration: underline; }
+
+  .head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 1rem; flex-wrap: wrap;
+    border-bottom: 2px solid var(--hairline);
+    padding-bottom: .75rem;
+  }
+  .head h1 { font-size: clamp(1.8rem, 5vw, 2.6rem); text-transform: uppercase; }
+  .from-line { margin: 0; display: flex; align-items: baseline; gap: .35rem; }
+  .from { font-size: .65rem; text-transform: uppercase; letter-spacing: .1em; color: var(--text-muted); }
+  .amount {
+    font-family: var(--brand); font-size: 1.9rem; line-height: 1;
+    color: var(--link); font-variant-numeric: tabular-nums;
+  }
+
+  .layout { display: grid; gap: 2rem; margin-top: 1.5rem; align-items: start; }
+
+  /* The prose column is capped so lines stay readable; the options column
+     takes the rest. Sticky on tall screens so the price list stays in view
+     while you read. */
+  @media (min-width: 52rem) {
+    .layout {
+      grid-template-columns: minmax(0, 1fr) minmax(20rem, 24rem);
+      gap: 3rem;
+    }
+    .col-about { position: sticky; top: calc(var(--nav-h) + 1.5rem); }
+  }
+
+  .description { margin: 0 0 1.75rem; }
+
+  .sub { font-size: 1.1rem; text-transform: uppercase; margin: 0 0 .75rem; }
+
+  /* border-spacing rather than border-collapse: the rows are separate cards
+     with a green edge on the highlighted one, and collapsed borders merge
+     them into a single block that loses that edge. */
+  .options {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 2px;
+    /* Price and action size to content; the label takes the rest. That is
+       what keeps the amounts and buttons in straight columns. */
+    table-layout: auto;
+  }
+
+  .options td,
+  .options th {
+    background: var(--surface);
+    border-block: 1px solid var(--edge);
+    padding: .8rem 1rem;
+    text-align: left;
+    font-weight: 400;
+    vertical-align: middle;
+  }
+
+  /* The row's outer edges belong to its first and last cell — with separate
+     borders there is no row box to put them on. */
+  .options th[scope='row'] { border-left: 3px solid var(--edge); }
+  .options .o-action { border-right: 1px solid var(--edge); }
+
+  .options tr.is-highlight th,
+  .options tr.is-highlight td {
+    background: color-mix(in srgb, var(--green) 12%, var(--surface));
+  }
+  .options tr.is-highlight th[scope='row'] { border-left-color: var(--green); }
+
+  .o-label { display: flex; flex-direction: column; gap: .15rem; }
+
+  .o-price { white-space: nowrap; text-align: right; }
+  .o-action { width: 1%; white-space: nowrap; }
+
+  .o-buy {
+    font-family: var(--body); font-weight: 700; font-size: .78rem;
+    text-transform: uppercase; letter-spacing: .06em;
+    background: var(--green); color: #0a0a0a;
+    border: 0; padding: .4rem .8rem; cursor: pointer;
+    white-space: nowrap;
+  }
+  .o-buy:hover, .o-buy:focus-visible { background: var(--green-bright); }
+  .o-note { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
+  .o-price {
+    font-family: var(--brand); font-size: 1.15rem;
+    color: var(--link); font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  .o-was { color: var(--text-muted); font-family: var(--body); font-size: .8rem; margin-right: .4rem; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: .75rem; }
+
+  .note { margin: 1.75rem 0 0; font-size: .85rem; color: var(--text-muted); }
+</style>

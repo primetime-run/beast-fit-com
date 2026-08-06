@@ -1,0 +1,100 @@
+# ---------------------------------------------------------------------------
+# What the gym sells.
+#
+# `url` is the ORIGINAL WordPress address for each product. Keeping those
+# paths alive is the whole point of the rebuild — anything already linking to
+# /membership-plans/ keeps working. The Training index links to them, and the
+# home page turns each one into a direct link.
+#
+# Prices and copy came from the WordPress export (the current "Membership
+# Types" generation, not the older "Membership Plans" one). They are several
+# years old — CONFIRM every figure before go-live.
+#
+# The "from" price shown on the home page is the cheapest option in each
+# product, computed at build time. Do not hard-code it anywhere.
+# ---------------------------------------------------------------------------
+
+products:
+  - id: membership
+    name: Membership
+    url: /membership-plans/
+    summary: Unlimited group classes. Longer terms cost less per month.
+    description: >-
+      Here at BEAST Fitness we bring you everything you need to meet all your
+      fitness goals. One of our most popular options is our Membership plan,
+      where you pay every month to attend the group fitness classes we run
+      every week. It takes away the stress of paying per class and gives you
+      the most value for your money. We still keep it small group and offer a
+      variety of full body workouts you will feel the next day. We operate
+      rain or shine.
+    options:
+      - label: Limited — 1 month
+        price: 60
+        note: Once a week
+      - label: Limited — 1 month, twice a week
+        price: 99
+      - label: Membership — 1 month
+        price: 129
+        note: Unlimited classes
+      - label: Membership — 3 months
+        price: 366
+        note: $122 a month
+      - label: Membership — 6 months
+        price: 714
+        note: $119 a month
+      - label: Membership — 1 year
+        price: 1380
+        note: $115 a month — best value
+        highlight: true
+
+  - id: drop-in
+    name: Drop In
+    url: /drop-in/
+    summary: Pay as you go. No commitment.
+    description: >-
+      Say you have a busy, hectic schedule, and remembering times and days for
+      a workout feels like too much — you just want to train when you can. The
+      drop-in option is perfect for that. Pay as you go and drop in whenever
+      your schedule allows.
+    options:
+      - label: 1 class
+        price: 20
+      - label: 1 week pass
+        price: 75
+      - label: 1 month pass
+        price: 139
+
+  - id: personal-training
+    name: Personal Training
+    url: /personal-training/
+    summary: One to one with a certified trainer. Singly or in blocks of ten.
+    description: >-
+      Maybe you are just starting out and the thought of working out with a
+      crowd feels overwhelming, or maybe you want to train on a more personal
+      and private level. That is where personal training comes in. Our
+      certified personal trainers work with you one to one, tailor everything
+      to what you need, and address any issues you have. They will show you
+      proper form and build every session around you.
+    options:
+      - label: 30 minutes
+        price: 50
+        was: 60
+      - label: 45 minutes
+        price: 75
+        was: 100
+      - label: 60 minutes
+        price: 99
+        was: 120
+      - label: 30 minutes × 10
+        price: 450
+        was: 500
+        note: $45 a session
+      - label: 45 minutes × 10
+        price: 650
+        was: 750
+        note: $65 a session
+      - label: 60 minutes × 10
+        price: 850
+        was: 1000
+        note: $85 a session
+        highlight: true

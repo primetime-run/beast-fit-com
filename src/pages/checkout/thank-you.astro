@@ -1,0 +1,45 @@
+---
+import Base from '../../layouts/Base.astro'
+
+/*
+  Shown after the hosted form reports a completed transaction.
+
+  Careful with the wording here. The signal that brings the browser to this
+  page comes FROM the browser, and a browser can be told to navigate anywhere.
+  It is not proof that money moved. Until the webhook confirms settlement
+  server-side, this page says the payment was submitted — not that it cleared,
+  and not that a place is booked.
+
+  It is also noindex: a receipt page has no business in search results.
+*/
+---
+
+<Base
+  title="Thank you — BEAST Fitness"
+  description="Your payment has been submitted."
+  noindex
+>
+  <h1 class="brand-title page-title">Thank you</h1>
+
+  <p class="lead">
+    Your payment has been submitted. You will get a receipt by email from our
+    payment processor once it clears.
+  </p>
+
+  <p>
+    We will be in touch to get you booked in. If you do not hear from us within
+    a day, or anything looks wrong, <a href="/contact/">let us know</a> — please
+    do not pay again.
+  </p>
+
+  <p class="actions">
+    <a class="btn" href="/schedule/">See the schedule</a>
+    <a class="btn ghost" href="/training/">Back to training</a>
+  </p>
+</Base>
+
+<style>
+  .page-title { font-size: clamp(1.9rem, 5vw, 2.6rem); text-transform: uppercase; }
+  .lead { font-size: 1.05rem; }
+  .actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 2rem; }
+</style>

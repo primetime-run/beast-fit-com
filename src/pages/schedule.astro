@@ -1,0 +1,684 @@
+---
+import Base from '../layouts/Base.astro'
+import ClassCalendarDialog from '../components/ClassCalendarDialog.astro'
+import { schedule, overrides, LAST_YEAR } from '../lib/data'
+import { generateSchedule } from '../lib/schedule'
+
+/*
+  Two views over the same data.
+
+  WEEK is the perpetual pattern — true today and true in three years, so it
+  cannot go stale between deploys. It is the default.
+
+  MONTH is real dates, twelve months from the build. It can go stale, so the
+  client hides months that have already passed and the deploy workflow
+  rebuilds on a schedule.
+
+  Every class is a link to its own .ics file. That is the no-JS behaviour and
+  it is genuinely useful on its own. With JS the click is intercepted and
+  opens a dialog offering three subscription scopes instead.
+*/
+
+const MONTHS_AHEAD = 12
+
+const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const
+const DAY_FULL: Record<string, string> = {
+  Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday',
+  Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday',
+}
+
+const time12 = (hhmm: string) => {
+  const [h, m] = hhmm.split(':').map(Number)
+  return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, '0')}${h < 12 ? 'a' : 'p'}`
+}
+
+// --- month view -----------------------------------------------------------
+const today = new Date()
+const months: { y: number; m: number }[] = []
+for (let i = 0; i < MONTHS_AHEAD; i++) {
+  const d = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + i, 1))
+  // Never generate past the last pinned holiday year — beyond it there is no
+  // holiday data and the grid would quietly show a class on Thanksgiving.
+  if (d.getUTCFullYear() > LAST_YEAR) break
+  months.push({ y: d.getUTCFullYear(), m: d.getUTCMonth() })
+}
+
+const first = `${months[0].y}-${String(months[0].m + 1).padStart(2, '0')}-01`
+const lastM = months[months.length - 1]
+const lastDayNum = new Date(Date.UTC(lastM.y, lastM.m + 1, 0)).getUTCDate()
+const last = `${lastM.y}-${String(lastM.m + 1).padStart(2, '0')}-${lastDayNum}`
+
+// Weeks begin on Sunday, matching the month grid, so generation starts at the
+// Sunday on or before the first of the first month — otherwise the opening
+// week would be short.
+const firstSundayT = (() => {
+  const d = Date.parse(first + 'T00:00:00Z')
+  return d - new Date(d).getUTCDay() * 86400000 // 0 = Sunday
+})()
+const genFrom = new Date(firstSundayT).toISOString().slice(0, 10)
+
+const generated = generateSchedule(schedule, overrides, genFrom, last)
+const byDate = new Map(generated.map((d) => [d.date, d]))
+
+// --- week view: dated weeks, same span as the months ----------------------
+const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
+function weekLabel(from: string, to: string) {
+  const [fy, fm, fd] = from.split('-').map(Number)
+  const [ty, tm, td] = to.split('-').map(Number)
+  if (fy !== ty) return `${MONTH_SHORT[fm - 1]} ${fd}, ${fy} – ${MONTH_SHORT[tm - 1]} ${td}, ${ty}`
+  if (fm !== tm) return `${MONTH_SHORT[fm - 1]} ${fd} – ${MONTH_SHORT[tm - 1]} ${td}, ${fy}`
+  return `${MONTH_SHORT[fm - 1]} ${fd} – ${td}, ${fy}`
+}
+
+/* A week runs Sunday to Saturday — the same boundary AND the same seven
+   columns as the month grid, so the two views are literally the same shape.
+
+   This used to display Mon..Sat on the reasoning that the gym has never run a
+   Sunday class, so the column was dead space. Two things were wrong with that.
+   A holiday session can land on a Sunday — July 4, 2027 does — and dropping
+   the column dropped the session with it, visible in the month view and
+   nowhere else. And six columns against the month's seven made every week
+   card ~12% wider than a month cell, which is why the two views never looked
+   the same size no matter what the container was set to.
+
+   Starting on Sunday also means that on a Sunday you see the week ahead
+   rather than the one that just ended. */
+const WEEK_OFFSETS = [0, 1, 2, 3, 4, 5, 6] // Sun..Sat — matches the month grid
+
+const weeks: { key: string; label: string; days: typeof generated }[] = []
+for (let t = firstSundayT; ; t += 7 * 86400000) {
+  const sunday = new Date(t).toISOString().slice(0, 10)
+  if (sunday > last) break
+  const days = WEEK_OFFSETS.map((i) =>
+    byDate.get(new Date(t + i * 86400000).toISOString().slice(0, 10))
+  ).filter(Boolean) as typeof generated
+  if (days.length < WEEK_OFFSETS.length) break
+  weeks.push({
+    // Keyed by the Sunday it starts on; labelled by the days it shows.
+    key: sunday,
+    label: weekLabel(days[0].date, days[days.length - 1].date),
+    days,
+  })
+}
+
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December']
+
+/* The month grid runs Sunday to Saturday, the usual US wall-calendar shape.
+   The week view is Monday-first because that is how a training week reads —
+   the two deliberately differ. */
+const MONTH_DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
+
+function monthGrid(y: number, m: number) {
+  const daysIn = new Date(Date.UTC(y, m + 1, 0)).getUTCDate()
+  const lead = new Date(Date.UTC(y, m, 1)).getUTCDay() // 0 = Sunday
+  const cells: (string | null)[] = Array(lead).fill(null)
+  for (let d = 1; d <= daysIn; d++) {
+    cells.push(`${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`)
+  }
+  while (cells.length % 7) cells.push(null)
+  const weeks: (string | null)[][] = []
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7))
+  return weeks
+}
+
+const monthViews = months.map(({ y, m }) => ({
+  key: `${y}-${String(m + 1).padStart(2, '0')}`,
+  label: `${MONTH_NAMES[m]} ${y}`,
+  weeks: monthGrid(y, m),
+}))
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'ExerciseGym',
+  name: 'BEAST Fitness',
+  url: 'https://beast-fit.com/schedule/',
+}
+---
+
+<Base
+  title="Class Schedule — BEAST Fitness"
+  description="Weekly and monthly class schedule for BEAST Fitness in Delray Beach, FL, with holiday closures, special sessions and calendar subscriptions."
+  jsonLd={jsonLd}
+  width="wide"
+>
+  <div class="page-head">
+    <h1 class="brand-title">Schedule</h1>
+    <div class="views" role="tablist" aria-label="Schedule view" data-views hidden>
+      {/* Both labels ship; CSS picks one. The aria-label carries the full
+          word so the control still reads as "Week" when it says "W". */}
+      <button type="button" role="tab" aria-selected="true" data-view-btn="week" aria-label="Week">
+        <span class="lbl-long">Week</span><span class="lbl-short">W</span>
+      </button>
+      <button type="button" role="tab" aria-selected="false" data-view-btn="month" aria-label="Month">
+        <span class="lbl-long">Month</span><span class="lbl-short">M</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ------------------------------- WEEK ------------------------------- -->
+  <section data-view="week" aria-label="Weekly schedule" data-week-section>
+    <div class="monthnav" data-weeknav hidden>
+      <button type="button" data-wprev aria-label="Previous week">&larr;</button>
+      <strong data-weeklabel aria-live="polite"></strong>
+      <button type="button" data-wnext aria-label="Next week">&rarr;</button>
+    </div>
+
+    {
+      weeks.map((wk) => (
+        <div class="weekblock" data-week={wk.key} data-label={wk.label}>
+          <h2 class="week-heading">{wk.label}</h2>
+          <div class="week">
+            {wk.days.map((d) => (
+              <section
+                data-date={d.date}
+                class={`card day${d.closed ? ' is-closed' : ''}${d.kind === 'replaced' || d.kind === 'added' ? ' is-special' : ''}`}
+              >
+                <h3>
+                  {DAY_FULL[DAYS[d.weekday - 1]]}
+                  <span class="daynum">{Number(d.date.slice(8))}</span>
+                </h3>
+                {d.label && <p class="holi-week">{d.label}</p>}
+                {d.closed ? (
+                  <p class="none closed">Closed</p>
+                ) : d.sessions.length === 0 ? (
+                  <p class="none">No classes</p>
+                ) : (
+                  <ul>
+                    {d.sessions.map((s) => (
+                      <li>
+                        <a
+                          class="sess"
+                          href={`/calendar/${s.special ? 'all' : s.classId}.ics`}
+                          data-pick
+                          data-date={d.date}
+                          data-time={s.time}
+                          data-class={s.classId}
+                          data-name={s.special ? s.name : undefined}
+                          data-dur={s.special ? String(s.duration) : undefined}
+                        >
+                          <span class="time">{time12(s.time)}</span>
+                          <span class="name">{s.name}</span>
+                          <span class="dur">{s.duration}m</span>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            ))}
+          </div>
+        </div>
+      ))
+    }
+  </section>
+
+  <!-- ------------------------------ MONTH ------------------------------- -->
+  <section data-view="month" aria-label="Monthly schedule" data-month-section>
+    <div class="monthnav" data-monthnav hidden>
+      <button type="button" data-prev aria-label="Previous month">&larr;</button>
+      <strong data-monthlabel aria-live="polite"></strong>
+      <button type="button" data-next aria-label="Next month">&rarr;</button>
+    </div>
+
+    {
+      monthViews.map((mv) => (
+        <div class="month" data-month={mv.key} data-label={mv.label}>
+          {/* Hidden once the navigator takes over — it names the month
+              already. Kept in the markup because without JS every month is
+              stacked and this is the only thing telling them apart. */}
+          <h2 class="month-heading">{mv.label}</h2>
+          <div class="grid">
+            {MONTH_DOW.map((d) => (
+              <div class="dow">{d}</div>
+            ))}
+            {mv.weeks.flat().map((date) => {
+              if (!date) return <div class="cell empty" />
+              const day = byDate.get(date)!
+              return (
+                <div
+                  data-date={date}
+                  class={`cell${day.closed ? ' is-closed' : ''}${day.kind === 'replaced' || day.kind === 'added' ? ' is-special' : ''}`}
+                >
+                  <span class="num">{Number(date.slice(8))}</span>
+                  {day.label && <span class="holi">{day.label}</span>}
+                  {day.closed && <span class="closedtag">Closed</span>}
+                  {day.sessions.map((s) => (
+                    <a
+                      class={`chip${s.special ? ' special' : ''}`}
+                      href={`/calendar/${s.special ? 'all' : s.classId}.ics`}
+                      title={s.name}
+                      data-pick
+                      data-date={date}
+                      data-time={s.time}
+                      data-class={s.classId}
+                      data-name={s.special ? s.name : undefined}
+                      data-dur={s.special ? String(s.duration) : undefined}
+                    >
+                      {time12(s.time)}
+                    </a>
+                  ))}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ))
+    }
+  </section>
+
+  <p class="whole-cal">
+    Prefer everything at once? <a href="/calendar/all.ics" download>Download the full class calendar</a>.
+  </p>
+
+  <ClassCalendarDialog />
+</Base>
+
+<script>
+  /* ---------------------------------------------------------------------
+     Progressive enhancement only. Without this the page still shows both
+     views stacked and every class is a plain link to its own .ics file.
+
+     The add-to-calendar dialog lives in ClassCalendarDialog.astro, which is
+     shared with the home page — it binds itself to any [data-pick] element.
+  --------------------------------------------------------------------- */
+  const $ = (s: string, r: ParentNode = document) => r.querySelector(s)
+  const $$ = (s: string, r: ParentNode = document) => Array.from(r.querySelectorAll(s))
+
+  /* --- view toggle ----------------------------------------------------- */
+  const views = $('[data-views]') as HTMLElement
+  views.hidden = false
+  function setView(view: string) {
+    for (const sec of $$('[data-view]') as HTMLElement[]) sec.hidden = sec.dataset.view !== view
+    for (const b of $$('[data-view-btn]') as HTMLElement[])
+      b.setAttribute('aria-selected', String(b.dataset.viewBtn === view))
+    try { localStorage.setItem('bf-view', view) } catch {}
+  }
+  for (const b of $$('[data-view-btn]') as HTMLElement[])
+    b.addEventListener('click', () => setView(b.dataset.viewBtn!))
+
+  /* --- paging, shared by weeks and months -------------------------------
+     Everything is server-rendered and stacked; this shows one at a time.
+     Anything already past is dropped, so a stale build never opens on a dead
+     week — with a fallback to showing them all if every entry is past.
+  --------------------------------------------------------------------- */
+  function pager(sectionSel: string, itemSel: string, dataKey: string, cutoff: string,
+                 navSel: string, labelSel: string, prevSel: string, nextSel: string) {
+    const nav = $(navSel) as HTMLElement | null
+    const items = $$(itemSel) as HTMLElement[]
+    if (!nav || !items.length) return
+    nav.hidden = false
+    // The navigator names the period, so the per-item headings are redundant.
+    // They stay in the DOM for the no-JS path.
+    ;($(sectionSel) as HTMLElement | null)?.classList.add('nav-active')
+
+    const live = items.filter((el) => (el.dataset[dataKey] as string) >= cutoff)
+    const shown = live.length ? live : items
+    for (const el of items) el.style.display = 'none'
+
+    const label = $(labelSel) as HTMLElement
+    const prev = $(prevSel) as HTMLButtonElement
+    const next = $(nextSel) as HTMLButtonElement
+    let i = 0
+
+    function show(n: number) {
+      i = Math.max(0, Math.min(shown.length - 1, n))
+      for (const el of shown) el.style.display = 'none'
+      shown[i].style.display = ''
+      label.textContent = shown[i].dataset.label!
+      prev.disabled = i === 0
+      next.disabled = i === shown.length - 1
+    }
+    prev.addEventListener('click', () => show(i - 1))
+    next.addEventListener('click', () => show(i + 1))
+    show(0)
+  }
+
+  /* Local date, not toISOString(). The gym is in Eastern time, so after ~8pm
+     ET the UTC date is already tomorrow — deriving "today" from UTC would
+     skip the current week every evening. */
+  const nowD = new Date()
+  const pad2 = (n: number) => String(n).padStart(2, '0')
+  const todayIso = `${nowD.getFullYear()}-${pad2(nowD.getMonth() + 1)}-${pad2(nowD.getDate())}`
+  const nowLocal = `${todayIso}T${pad2(nowD.getHours())}:${pad2(nowD.getMinutes())}`
+  const tToday = Date.parse(todayIso + 'T00:00:00Z')
+
+  // Weeks are keyed by the Sunday they start on, so the cutoff is this week's
+  // Sunday — on a Sunday that keeps you on the week ahead, not the one that
+  // just finished.
+  const thisSunday = new Date(tToday - new Date(tToday).getUTCDay() * 86400000)
+    .toISOString()
+    .slice(0, 10)
+
+  pager('[data-week-section]', '.weekblock', 'week', thisSunday,
+        '[data-weeknav]', '[data-weeklabel]', '[data-wprev]', '[data-wnext]')
+
+  pager('[data-month-section]', '.month', 'month', todayIso.slice(0, 7),
+        '[data-monthnav]', '[data-monthlabel]', '[data-prev]', '[data-next]')
+
+  /* --- today, past days, and the next class -----------------------------
+     Done in the browser, never at build time: a page built on Monday would
+     otherwise still be calling Monday "today" a week later.
+  --------------------------------------------------------------------- */
+  for (const el of $$('.cell[data-date], .day[data-date]') as HTMLElement[]) {
+    const d = el.dataset.date!
+    if (d === todayIso) el.classList.add('is-today')
+    else if (d < todayIso) el.classList.add('is-past')
+  }
+
+  let next: string | null = null
+  const picks = $$('[data-pick][data-date]') as HTMLElement[]
+  for (const el of picks) {
+    if (el.closest('.is-past')) continue
+    const s = `${el.dataset.date}T${el.dataset.time}`
+    if (s >= nowLocal && (next === null || s < next)) next = s
+  }
+  if (next) {
+    for (const el of picks) {
+      if (`${el.dataset.date}T${el.dataset.time}` === next) el.classList.add('is-next')
+    }
+  }
+
+  /* --- boot ------------------------------------------------------------ */
+  let initial = 'week'
+  try { initial = localStorage.getItem('bf-view') || 'week' } catch {}
+  setView(initial)
+</script>
+
+<style>
+  /* Title and view switch share a row. */
+  .page-head {
+    display: flex; flex-wrap: wrap; gap: 1rem;
+    align-items: center; justify-content: space-between;
+    margin-block: 0 1.5rem;
+  }
+
+  /* The navigator names the month; the per-month heading is only for no-JS. */
+  .nav-active .month-heading { display: none; }
+  .views { display: inline-flex; border: 1px solid var(--hairline); border-radius: 4px; overflow: hidden; }
+  .views button {
+    font-family: var(--display); font-weight: 700; font-size: .9rem; background: transparent;
+    color: var(--text); border: 0; padding: .55rem 1.25rem; cursor: pointer;
+  }
+  .views button[aria-selected='true'] { background: var(--green); color: #0a0a0a; }
+  .lbl-short { display: none; }
+
+  @media (max-width: 30rem) {
+    .lbl-long { display: none; }
+    .lbl-short { display: inline; }
+    .views button { font-size: .8rem; padding: .45rem .8rem; }
+    .page-head { gap: .5rem; }
+  }
+
+  /* Hidden, but deliberately still in the DOM — /calendar/all.ics stays a
+     working route and the link remains for anyone who wants it. */
+  .whole-cal { display: none; }
+
+  /* Width comes from width="wide" on <Base> — the same 82rem every other
+     non-prose page uses, so the calendar lines up with the masthead and with
+     the rest of the site. This page ran full-bleed for a while; edge to edge
+     on a large monitor gave wider day columns but made the schedule the one
+     page where the furniture moved, which was worse. */
+
+  /* --- week ---
+     Below desktop the days flow into whatever columns fit. At desktop it
+     becomes a true week: seven equal columns, Sunday to Saturday, matching
+     the month grid column for column.
+  */
+  .week { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem,1fr)); gap: 1rem; margin-block: 1rem 2rem; }
+  .week-heading { font-size: 1.25rem; color: var(--link); }
+  .nav-active .week-heading { display: none; }
+  /* Same card treatment as the training products: square, a stronger --edge
+     border, a green rule across the top, no shadow. .card is shared with the
+     trainer and product pages, so this overrides here rather than there. */
+  .day {
+    border-radius: 0;
+    border: 1px solid var(--edge);
+    border-top: 3px solid var(--green);
+    box-shadow: none;
+  }
+  .day.is-closed { background: var(--cell-closed); }
+  .day.is-special { background: var(--cell-special); }
+  .day h3 {
+    margin: 0 0 .6rem; font-size: 1.05rem; color: var(--link);
+    display: flex; align-items: baseline; justify-content: space-between; gap: .5rem;
+  }
+  .daynum { font-variant-numeric: tabular-nums; color: var(--text-muted); font-weight: 400; font-size: .9rem; }
+  .holi-week { margin: -.35rem 0 .6rem; font-size: .78rem; color: var(--link); font-weight: 700; }
+  .none.closed { color: var(--danger); font-weight: 700; }
+  .day h2 { margin: 0 0 .75rem; font-size: 1.15rem; color: var(--link); }
+  .day ul { list-style: none; margin: 0; padding: 0; }
+  .day li { border-top: 1px solid var(--hairline); }
+  .day li:first-child { border-top: 0; }
+  .sess {
+    display: grid; grid-template-columns: auto 1fr auto; gap: .6rem;
+    align-items: baseline; padding: .45rem .35rem; text-decoration: none;
+    color: var(--text); border-radius: 3px;
+  }
+  .sess:hover, .sess:focus-visible { background: rgba(139,195,74,.2); color: var(--text); }
+  .time { font-variant-numeric: tabular-nums; color: var(--link); font-weight: 700; }
+  .dur { color: var(--text-muted); font-size: .85rem; }
+  .none { color: var(--text-muted); margin: 0; }
+
+  /* --- month --- */
+  .monthnav { display: flex; align-items: center; gap: 1rem; margin-block: 1rem; }
+  .monthnav strong { font-family: var(--display); font-size: 1.15rem; min-width: 12rem; }
+  .monthnav button {
+    background: transparent; color: var(--text); cursor: pointer;
+    border: 1px solid var(--hairline); border-radius: 4px;
+    width: 2.25rem; height: 2.25rem;
+  }
+  .monthnav button:disabled { opacity: .3; cursor: default; }
+
+  .month h2 { font-size: 1.25rem; color: var(--link); }
+  .grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; background: var(--hairline); border: 1px solid var(--hairline); }
+  .dow { background: var(--bg); padding: .4rem; text-align: center; font-family: var(--display); font-weight: 700; font-size: .75rem; color: var(--text-muted); }
+  .cell { background: var(--surface); min-height: 6rem; padding: .35rem; display: flex; flex-direction: column; gap: .1rem; }
+  .cell.empty { background: var(--surface-2); min-height: 0; }
+  .cell.is-closed { background: var(--cell-closed); }
+  .cell.is-special { background: var(--cell-special); }
+  .num { font-variant-numeric: tabular-nums; font-weight: 700; }
+  .holi { font-size: .65rem; color: var(--link); line-height: 1.15; }
+  .closedtag { font-size: .7rem; color: var(--danger); font-weight: 700; }
+  .chip {
+    font-size: .72rem; color: var(--link); font-variant-numeric: tabular-nums;
+    text-decoration: none; border-radius: 2px; padding: 0 .15rem;
+  }
+  .chip:hover, .chip:focus-visible { background: var(--green); color: #0a0a0a; }
+  .chip.special { color: var(--green-dark); font-weight: 700; }
+  @media (prefers-color-scheme: dark) {
+    .chip.special { color: var(--green-bright); }
+  }
+
+  /* --- today / past / next ------------------------------------------------
+     All three classes are applied by script, because "today" cannot be baked
+     into a static build.
+
+     The outline uses --link rather than --green: at 2px it is a UI boundary,
+     and #8bc34a on a white surface measures ~1.9:1, well under the 3:1
+     WCAG 1.4.11 asks for. --link clears it in both themes.
+  */
+  .cell.is-today, .day.is-today {
+    outline: 2px solid var(--link);
+    outline-offset: -2px;
+  }
+  .day.is-today h3 { color: var(--link); }
+
+  /* Past days are context, not offers. Dimmed, and inert — pointer-events
+     stops the link firing at all, with a guard in the click handler too. */
+  .cell.is-past, .day.is-past { opacity: .5; }
+  .cell.is-past .chip,
+  .day.is-past .sess {
+    pointer-events: none;
+    cursor: default;
+  }
+
+  /* The next class up. */
+  .sess.is-next, .chip.is-next {
+    background: var(--green);
+    color: #0a0a0a;
+    font-weight: 700;
+    border-radius: 3px;
+  }
+  .sess.is-next .time,
+  .sess.is-next .dur,
+  .sess.is-next .name { color: #0a0a0a; }
+
+  @media (max-width: 40rem) {
+    .cell { min-height: 4.5rem; font-size: .8rem; }
+    .holi { display: none; }
+
+    /* Sunday is the first column and never has a class in it. On a phone that
+       is a seventh of the width doing nothing, so it collapses to a sliver —
+       narrowed rather than removed, because dropping a column would shift
+       every date onto the wrong weekday.
+
+       The grid's children are the seven day headings followed by the cells,
+       so nth-child(7n+1) is the Sunday column in both. */
+    .grid { grid-template-columns: 2rem repeat(6, 1fr); }
+
+    .grid > :nth-child(7n + 1) {
+      padding-inline: .15rem;
+    }
+
+    .dow:nth-child(7n + 1) {
+      font-size: .55rem;
+      letter-spacing: -0.02em;
+    }
+
+    .cell:nth-child(7n + 1) .num {
+      font-size: .7rem;
+      font-weight: 400;
+      opacity: .55;
+    }
+  }
+
+  /* --- below desktop: use the whole screen -------------------------------
+     The panel inherits .wrap's 1.25rem inline padding and adds 1.75rem of its
+     own — 3rem a side, which is over a tenth of a tablet screen spent on
+     nothing. Below the desktop breakpoint that shrinks right down so the
+     grid gets the width instead.
+
+     The columns also step down deliberately rather than letting auto-fit
+     decide. Left to itself it dropped from six columns straight to three
+     awkward wide ones, with the last row half empty.
+  */
+  @media (max-width: 63.99rem) {
+    :global(main.panel) {
+      padding-left: .6rem;
+      padding-right: .6rem;
+    }
+
+    .week { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6rem; }
+    .day { padding: .9rem .75rem; }
+    .day h3 { font-size: .95rem; }
+    .daynum { font-size: 1.1rem; }
+    .sess {
+      grid-template-columns: auto auto;
+      grid-template-areas: 'time dur' 'name name';
+      justify-content: start;
+      column-gap: .4rem;
+      row-gap: .1rem;
+    }
+    .sess .time { grid-area: time; }
+    .sess .dur  { grid-area: dur; }
+    .sess .name { grid-area: name; font-size: .82rem; line-height: 1.3; }
+  }
+
+  @media (max-width: 46rem) {
+    .week { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  @media (max-width: 30rem) {
+    .week { grid-template-columns: 1fr; }
+    .day h3 { flex-direction: row; align-items: baseline; justify-content: space-between; }
+  }
+
+  /* --- desktop week: seven columns ---------------------------------------
+     The page is widened here rather than globally — seven columns inside the
+     default 68rem measure leaves ~8rem each, which wraps a name like
+     "Cross Training: Chest, Shoulders, and Triceps" to five lines. This CSS
+     only ships on the schedule page, so nothing else is affected.
+  */
+  @media (min-width: 64rem) {
+    /* Seven columns, the same as the month grid. Both views are children of
+       the same panel, so identical column counts make identical cell widths —
+       that is what "the same size" actually required. Setting widths on the
+       containers never could, because the containers were never different. */
+    .week {
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: .5rem;
+      align-items: stretch;
+    }
+
+    /* The month grid gets the same treatment as the week. Both views live in
+       the same panel and are therefore already the same width — what made the
+       month look narrower was that only the week had its type and spacing
+       scaled up here, so its cells filled the column while the month's sat
+       small inside theirs. */
+    .cell { min-height: 8rem; padding: .5rem; gap: .15rem; }
+    .num { font-size: 1rem; }
+    .chip { font-size: .78rem; padding: .05rem .25rem; }
+    .holi { font-size: .7rem; }
+    .closedtag { font-size: .75rem; }
+    .dow { font-size: .8rem; padding: .55rem; }
+
+    .day { padding: .9rem .75rem; }
+
+    /* Day name and date on one line, the date given real prominence — it is
+       what people scan for. Reverts an earlier stack that was there for
+       six narrow columns; there is room for both on a line. */
+    .day h3 {
+      flex-direction: row;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: .4rem;
+      font-size: .95rem;
+      margin-bottom: .5rem;
+    }
+
+    .daynum { font-size: 1.15rem; }
+
+    /* Time and duration share a line; the class name gets the full width
+       beneath rather than being crushed into a third of the column. */
+    .sess {
+      grid-template-columns: auto auto;
+      grid-template-areas: 'time dur' 'name name';
+      justify-content: start;
+      column-gap: .4rem;
+      row-gap: .1rem;
+      padding: .45rem .35rem;
+    }
+    .sess .time { grid-area: time; font-size: .85rem; }
+    .sess .dur  { grid-area: dur; font-size: .72rem; }
+    .sess .name { grid-area: name; font-size: .8rem; line-height: 1.3; }
+
+    .holi-week { font-size: .72rem; }
+  }
+
+  /* --- large desktop -----------------------------------------------------
+     The page is full-bleed, so past 90rem the columns are already wide. What
+     was set for a narrow column reads small in them, so the type and spacing
+     step up here — both views together, so they stay the same size as each
+     other.
+  */
+  @media (min-width: 90rem) {
+    /* week */
+    .week { gap: .75rem; }
+    .day { padding: 1.1rem 1rem; }
+    .day h3 { font-size: 1.05rem; margin-bottom: .65rem; }
+    .daynum { font-size: 1.3rem; }
+    .sess { padding: .55rem .45rem; }
+    .sess .time { font-size: .95rem; }
+    .sess .dur { font-size: .78rem; }
+    .sess .name { font-size: .88rem; }
+
+    /* month — same step up */
+    .cell { min-height: 10rem; padding: .6rem; }
+    .num { font-size: 1.15rem; }
+    .chip { font-size: .85rem; padding: .1rem .3rem; }
+    .holi { font-size: .75rem; }
+    .closedtag { font-size: .8rem; }
+    .dow { font-size: .9rem; padding: .65rem; }
+  }
+</style>

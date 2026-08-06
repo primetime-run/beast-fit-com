@@ -1,0 +1,221 @@
+---
+import Base from '../../layouts/Base.astro'
+import CheckoutLightbox from '../../components/CheckoutLightbox.astro'
+
+/*
+  $1 end-to-end payment test.
+
+  noindex, and linked from nothing. It exists so the whole path — button,
+  token endpoint, hosted form, iframe communicator, thank-you page and
+  webhook — can be exercised against a real charge without pretending a
+  membership was sold.
+
+  It works in BOTH environments, and which one you are in is not something
+  this page can know at build time: the environment is decided server-side by
+  AUTHNET_ENV on the Lambda. So the page asks. "Check endpoint" mints a token
+  and reports which gateway host it came back for, which is the only
+  trustworthy answer.
+
+  Read that answer before typing a card number.
+*/
+
+const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
+---
+
+<Base
+  title="Payment test — BEAST Fitness"
+  description="Internal $1 payment test."
+  noindex
+>
+  <h1 class="brand-title page-title">Payment test</h1>
+
+  <p class="lede">
+    Charges <strong>$1.00</strong> through the real checkout path. Not linked
+    from anywhere and kept out of search results.
+  </p>
+
+  <section class="card">
+    <h2 class="brand-title sub">1 — Check the endpoint</h2>
+    <p class="hint">
+      Asks for a token and reports which gateway it is for, without opening the
+      card form. Do this first.
+    </p>
+
+    <p class="cfg">
+      <span class="k">Endpoint</span>
+      <code>{endpoint || 'not set — see below'}</code>
+    </p>
+
+    <button type="button" class="btn" data-preflight>Check endpoint</button>
+    <pre class="out" data-preflight-out hidden></pre>
+  </section>
+
+  <section class="card">
+    <h2 class="brand-title sub">2 — Pay $1.00</h2>
+    <p class="hint">
+      Opens the same lightbox the product pages use. On success you land on the
+      thank-you page.
+    </p>
+
+    {/* Identical to a real Buy button: catalog keys only, no price. The $1
+        lives in catalog.json, server-side. */}
+    <button
+      type="button"
+      class="btn"
+      data-buy
+      data-product="test"
+      data-option="one-dollar"
+      aria-label="Pay one dollar test charge"
+    >
+      Pay $1.00
+    </button>
+  </section>
+
+  <section class="card">
+    <h2 class="brand-title sub">Sandbox test cards</h2>
+    <p class="hint">
+      For the sandbox gateway only. These are declined by the live gateway —
+      and a real card on the sandbox is not charged.
+    </p>
+    <table class="cards">
+      <tbody>
+        <tr><th scope="row">Visa</th><td><code>4111 1111 1111 1111</code></td></tr>
+        <tr><th scope="row">Mastercard</th><td><code>5424 0000 0000 0015</code></td></tr>
+        <tr><th scope="row">Amex</th><td><code>3700 0000 0000 002</code></td></tr>
+        <tr><th scope="row">Discover</th><td><code>6011 0000 0000 0012</code></td></tr>
+        <tr><th scope="row">Expiry</th><td>any future date</td></tr>
+        <tr><th scope="row">CVV</th><td>any 3 digits (4 for Amex)</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="card warn">
+    <h2 class="brand-title sub">If this is the live account</h2>
+    <p class="hint">
+      The dollar is real. It settles, it appears on the statement, and it
+      carries the usual processing fee whether or not you refund it. Refund it
+      from the Merchant Interface once the webhook has reported the charge.
+    </p>
+  </section>
+
+  <CheckoutLightbox />
+</Base>
+
+<script define:vars={{ endpoint }}>
+  const btn = document.querySelector('[data-preflight]')
+  const out = document.querySelector('[data-preflight-out]')
+
+  const show = (text) => {
+    out.textContent = text
+    out.hidden = false
+  }
+
+  btn?.addEventListener('click', async () => {
+    if (!endpoint) {
+      show(
+        'PUBLIC_CHECKOUT_ENDPOINT is not set.\n\n' +
+          'Locally, put this in .env.local and restart the dev server:\n' +
+          '  PUBLIC_CHECKOUT_ENDPOINT=http://localhost:8788\n\n' +
+          'Then run the Lambda:  npm run dev:checkout'
+      )
+      return
+    }
+
+    btn.disabled = true
+    show('Requesting a token…')
+
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ product: 'test', option: 'one-dollar' }),
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        show(`HTTP ${res.status}\nerror: ${data.error ?? '(none)'}\n\n${HINTS[data.error] ?? ''}`)
+        return
+      }
+
+      /* The gateway host in `action` is the authoritative environment signal —
+         the token was minted by whichever one it names. */
+      const live = data.action?.startsWith('https://accept.authorize.net')
+
+      show(
+        [
+          live ? '*** LIVE GATEWAY — a real dollar ***' : 'Sandbox gateway — no real money',
+          '',
+          `charging   ${data.summary?.product} — ${data.summary?.option}`,
+          `amount     $${data.summary?.amount}`,
+          `posts to   ${data.action}`,
+          `token      ${String(data.token).slice(0, 24)}… (${String(data.token).length} chars)`,
+          '',
+          'Token minted OK. This one is now spent — step 2 requests a fresh one.',
+        ].join('\n')
+      )
+    } catch (err) {
+      show(
+        `Request failed: ${err.message}\n\n` +
+          'Usually the Lambda is not running, or the browser blocked it as\n' +
+          'cross-origin. Check the dev:checkout console for the origin it\n' +
+          'allows, and that it matches the address in your URL bar exactly\n' +
+          '(localhost and 127.0.0.1 are different origins).'
+      )
+    } finally {
+      btn.disabled = false
+    }
+  })
+
+  const HINTS = {
+    origin_not_allowed:
+      'The endpoint does not trust this page origin. Set ALLOWED_ORIGINS on\n' +
+      'the Lambda to include it exactly, scheme and port included.',
+    not_configured: 'The Lambda has no AUTHNET_LOGIN_ID / AUTHNET_TRANSACTION_KEY.',
+    unknown_product:
+      'catalog.json has no "test" product. Run: npm run generate-catalog',
+    unknown_option: 'The test product exists but has no "one-dollar" option.',
+    gateway_refused:
+      'Authorize.Net rejected the request — almost always wrong credentials,\n' +
+      'or sandbox keys sent to the live host (or the reverse). The reason is\n' +
+      'in the Lambda log; it is kept out of the browser on purpose.',
+    gateway_unreachable: 'The Lambda could not reach Authorize.Net at all.',
+    rate_limited: 'More than 20 requests in a minute from this IP. Wait a minute.',
+  }
+</script>
+
+<style>
+  .page-title { font-size: clamp(1.9rem, 5vw, 2.6rem); text-transform: uppercase; }
+  .lede { color: var(--text-muted); }
+
+  .card {
+    background: var(--surface-2);
+    border: 1px solid var(--edge);
+    border-top: 3px solid var(--green);
+    padding: 1.25rem;
+    margin-top: 1.5rem;
+  }
+  .card.warn { border-top-color: #d08a1f; }
+
+  .sub { font-size: 1rem; text-transform: uppercase; margin: 0 0 .4rem; }
+  .hint { margin: 0 0 1rem; font-size: .88rem; color: var(--text-muted); }
+
+  .cfg { margin: 0 0 1rem; font-size: .85rem; display: flex; flex-wrap: wrap; gap: .5rem; }
+  .k { text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); font-size: .75rem; }
+
+  code { font-size: .85em; word-break: break-all; }
+
+  .out {
+    margin: 1rem 0 0;
+    padding: .9rem;
+    background: var(--bg);
+    border: 1px solid var(--hairline);
+    font-size: .8rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-x: auto;
+  }
+
+  .cards { border-collapse: collapse; font-size: .85rem; }
+  .cards th, .cards td { text-align: left; padding: .3rem .9rem .3rem 0; font-weight: 400; }
+  .cards th { color: var(--text-muted); white-space: nowrap; }
+</style>

@@ -1,0 +1,318 @@
+---
+import Base from '../layouts/Base.astro'
+import Directions from '../components/Directions.astro'
+import { training, gymSchema } from '../lib/data'
+
+/*
+  Contact form.
+
+  Posts JSON to a Lambda Function URL that sends via SES. Both values below
+  are injected at build time and neither is a secret: the Function URL is a
+  public endpoint that validates everything server-side, and a Turnstile site
+  key is designed to be visible in markup. Set them as repository *variables*.
+
+  The topic is pre-selected from ?topic=<id> — every "Ask about …" link on the
+  product pages carries one, so someone arriving from the Membership page
+  lands with Membership already chosen. The value posted is an id, not a
+  label: the Lambda maps it through its own allow-list rather than echoing
+  what the browser sent, because it ends up in the subject line.
+*/
+
+const ENDPOINT = import.meta.env.PUBLIC_CONTACT_ENDPOINT ?? ''
+const TURNSTILE_KEY = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY ?? ''
+
+// Topics are derived from the products, so adding one to training.yaml adds
+// it here too and there is no second list to keep in step.
+const topics = [
+  ...training.products.map((p) => ({ id: p.id, label: p.name })),
+  { id: 'schedule', label: 'Class schedule' },
+  { id: 'other', label: 'Something else' },
+]
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'ContactPage',
+  name: 'Contact BEAST Fitness',
+  url: 'https://beast-fit.com/contact/',
+  about: gymSchema(),
+}
+---
+
+<Base
+  title="Contact — BEAST Fitness"
+  description="Get in touch with BEAST Fitness in Delray Beach, Florida about memberships, drop-in classes or personal training."
+  jsonLd={jsonLd}
+  width="wide"
+>
+  {/* The handle sits beside the title rather than in a "Follow" heading down
+      in the sidebar. Instagram is where this gym actually answers people, so
+      it belongs at the top of the contact page, not below the map.
+
+      The glyph is inline SVG, not a font or a remote asset: it is one path,
+      it inherits currentColor so it tracks the theme, and it costs no extra
+      request. aria-hidden because the handle beside it is the accessible
+      name — a screen reader announcing "Instagram Instagram @beast_fitness1"
+      helps nobody. */}
+  <div class="head">
+    <h1 class="brand-title page-title">Contact</h1>
+    <a class="ig" href="https://www.instagram.com/beast_fitness1/" rel="noopener me">
+      {/* Outlined rather than the solid one-path version: filled Instagram
+          glyphs rely on evenodd fill-rule to knock the lens out of the body,
+          and when that does not take you get a plain green square. Strokes
+          cannot fail that way. */}
+      <svg
+        viewBox="0 0 24 24"
+        width="20"
+        height="20"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        aria-hidden="true"
+        focusable="false"
+      >
+        <rect x="2" y="2" width="20" height="20" rx="5.5"></rect>
+        <circle cx="12" cy="12" r="4.2"></circle>
+        <circle cx="17.6" cy="6.4" r="1.1" fill="currentColor" stroke="none"></circle>
+      </svg>
+      <span>@beast_fitness1</span>
+    </a>
+  </div>
+
+  <p class="lede">
+    Tell us what you are after and we will get back to you. Class times are on the
+    <a href="/schedule/">schedule</a>.
+  </p>
+
+  <div class="layout">
+    <form id="contact-form" novalidate>
+      <div class="row">
+        <label>
+          <span class="lbl">First name <span class="req" aria-hidden="true">*</span></span>
+          <input type="text" name="firstName" required autocomplete="given-name" maxlength="80" />
+        </label>
+        <label>
+          <span class="lbl">Last name <span class="req" aria-hidden="true">*</span></span>
+          <input type="text" name="lastName" required autocomplete="family-name" maxlength="80" />
+        </label>
+      </div>
+
+      <div class="row">
+        <label>
+          <span class="lbl">Email <span class="req" aria-hidden="true">*</span></span>
+          <input type="email" name="email" required autocomplete="email" maxlength="160" />
+        </label>
+        <label>
+          <span class="lbl">Phone <span class="opt">optional</span></span>
+          <input type="tel" name="phone" autocomplete="tel" maxlength="40" />
+        </label>
+      </div>
+
+      <label>
+        <span class="lbl">What is it about?</span>
+        <select name="topic" data-topic>
+          {topics.map((t) => <option value={t.id}>{t.label}</option>)}
+        </select>
+      </label>
+
+      <label>
+        <span class="lbl">Message <span class="req" aria-hidden="true">*</span></span>
+        <textarea name="message" required rows="6" maxlength="4000"></textarea>
+      </label>
+
+      {/* Not a person-visible field. Anything that fills it is a bot — and the
+          server answers 200 anyway, so it learns nothing from the response. */}
+      <div class="hp" aria-hidden="true">
+        <label>Leave this empty <input type="text" name="company" tabindex="-1" autocomplete="off" /></label>
+      </div>
+
+      {TURNSTILE_KEY && (
+        <div class="cf-turnstile" data-sitekey={TURNSTILE_KEY} data-theme="auto"></div>
+      )}
+
+      <div class="actions">
+        <button type="submit" class="btn">Send</button>
+        <p class="status" data-status role="status" aria-live="polite"></p>
+      </div>
+    </form>
+
+    <aside class="details">
+      <Directions />
+
+      {/* "Follow" used to live here. It is up beside the page title now —
+          repeating the handle would put the same destination on the page
+          twice. */}
+
+      <h2 class="brand-title sub">Training</h2>
+      <ul class="links">
+        {training.products.map((p) => <li><a href={p.url}>{p.name}</a></li>)}
+      </ul>
+    </aside>
+  </div>
+</Base>
+
+{TURNSTILE_KEY && (
+  <script is:inline async src="https://challenges.cloudflare.com/turnstile/v0/api.js"></script>
+)}
+
+<script define:vars={{ ENDPOINT }}>
+  const form = document.getElementById('contact-form')
+  const status = document.querySelector('[data-status]')
+  const select = document.querySelector('[data-topic]')
+
+  /* Pre-select the topic from ?topic=<id>. Compared against the options that
+     actually exist, so a junk value in the URL just leaves the default. */
+  const wanted = new URLSearchParams(location.search).get('topic')
+  if (wanted && select) {
+    const match = Array.from(select.options).find((o) => o.value === wanted)
+    if (match) select.value = match.value
+  }
+
+  /* Stamped when the page renders. The server rejects anything submitted
+     within a few seconds of this — no human fills a form that fast. */
+  const renderedAt = Date.now()
+
+  function say(msg, kind) {
+    status.textContent = msg
+    status.className = 'status ' + (kind || '')
+  }
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const data = Object.fromEntries(new FormData(form).entries())
+
+    if (!data.firstName || !data.lastName || !data.email || !data.message) {
+      return say('Please fill in the required fields.', 'err')
+    }
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(data.email))) {
+      return say('That email address does not look right.', 'err')
+    }
+    if (!ENDPOINT) {
+      return say('This form is not connected yet. Please reach us on Instagram in the meantime.', 'err')
+    }
+
+    const btn = form.querySelector('button[type="submit"]')
+    btn.disabled = true
+    say('Sending…')
+
+    try {
+      const res = await fetch(ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...data, renderedAt, elapsedMs: Date.now() - renderedAt }),
+      })
+      if (res.ok) {
+        form.reset()
+        say('Thanks — we will be in touch shortly.', 'ok')
+      } else {
+        say('Something went wrong sending that. Please try again.', 'err')
+      }
+    } catch {
+      say('Could not reach the server. Please check your connection and try again.', 'err')
+    } finally {
+      btn.disabled = false
+    }
+  })
+</script>
+
+<style>
+  .page-title { font-size: clamp(2rem, 6vw, 3rem); text-transform: uppercase; }
+
+  /* Baseline-aligned so the handle sits on the title's baseline rather than
+     floating against a 3rem cap height. wrap, so a narrow phone drops it to
+     its own line instead of crushing the title. */
+  .head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: .75rem 1.25rem;
+    flex-wrap: wrap;
+  }
+
+  .ig {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: .95rem;
+    white-space: nowrap;
+  }
+  /* The glyph is baseline-aligned as part of the flex line, which drops it a
+     couple of pixels low against the text next to it. */
+  .ig svg { flex: none; transform: translateY(.18em); }
+  .ig:hover span,
+  .ig:focus-visible span { text-decoration: underline; }
+  .lede { color: var(--text-muted); max-width: 44rem; margin-top: .5rem; }
+
+  .layout { display: grid; gap: 2rem; margin-top: 2rem; align-items: start; }
+
+  /* Wider than the default measure: the form and the map sit side by side,
+     and at 68rem the map column was too narrow to read street names in. */
+  @media (min-width: 52rem) {
+    .layout { grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem); gap: 3rem; }
+  }
+  @media (min-width: 64rem) {
+    .layout { grid-template-columns: minmax(0, 1fr) 24rem; gap: 3.5rem; }
+  }
+
+  form { display: grid; gap: .85rem; }
+  .row { display: grid; gap: .85rem; grid-template-columns: 1fr; }
+  @media (min-width: 34rem) { .row { grid-template-columns: 1fr 1fr; } }
+
+  label { display: grid; gap: .3rem; }
+
+  /* Labels are set in the body face, not --brand. Black Ops One is a wide
+     display face: at label size, with uppercase and letter-spacing, "First
+     name *" simply would not fit a half-width column and wrapped onto two
+     lines, throwing the two fields out of alignment. Roboto at 700 gives the
+     same emphasis in roughly two-thirds the width. */
+  .lbl {
+    font-family: var(--body);
+    font-size: .74rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .045em;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+  .req { color: var(--link); margin-left: .1rem; }
+  .opt {
+    text-transform: none; letter-spacing: 0; font-weight: 400;
+    font-size: .7rem; opacity: .8; margin-left: .25rem;
+  }
+
+  input, select, textarea {
+    font-family: var(--body);
+    font-size: 1rem;
+    line-height: 1.4;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--edge);
+    border-radius: 0;
+    padding: .55rem .65rem;
+    width: 100%;
+    min-width: 0; /* stops long values forcing the grid column wider */
+  }
+  textarea { resize: vertical; }
+  input:focus-visible, select:focus-visible, textarea:focus-visible {
+    outline: 3px solid var(--green-bright);
+    outline-offset: 1px;
+  }
+
+  /* Off-screen rather than display:none — some bots skip hidden fields. */
+  .hp {
+    position: absolute; left: -9999px; width: 1px; height: 1px;
+    overflow: hidden;
+  }
+
+  .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
+  .status { margin: 0; font-size: .9rem; }
+  .status.ok { color: var(--link); font-weight: 700; }
+  .status.err { color: var(--danger); font-weight: 700; }
+
+  .details { font-size: .92rem; }
+  .sub { font-size: .9rem; text-transform: uppercase; margin: 0 0 .4rem; }
+  .details h2:not(:first-child) { margin-top: 1.5rem; }
+  .addr { margin: 0; color: var(--text-muted); line-height: 1.7; }
+  .links { list-style: none; margin: 0; padding: 0; display: grid; gap: .3rem; }
+</style>

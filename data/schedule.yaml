@@ -1,0 +1,84 @@
+# Beast-Fit weekly class schedule
+# ---------------------------------------------------------------------------
+# Derived from the WordPress export (published, future-dated tribe_events).
+# This file replaces 4,948 individual event posts. It is perpetual: the site
+# generates concrete dates at build time, so the calendar never runs dry.
+#
+# Editing this file + a git push is the entire workflow for schedule changes.
+# ---------------------------------------------------------------------------
+
+timezone: America/New_York   # Delray Beach, FL is Eastern. Confirmed.
+
+classes:
+  - id: cardio-conditioning
+    name: Cardio Conditioning
+    duration: 60
+    slots:
+      - { day: Mon, times: ["05:30", "06:30", "08:00", "17:30"] }
+      - { day: Fri, times: ["05:30", "06:30", "08:00"] }   # note: no evening class Friday
+
+  - id: cross-training-chest-shoulders-triceps
+    name: "Cross Training: Chest, Shoulders, and Triceps"
+    duration: 60
+    slots:
+      - { day: Tue, times: ["05:30", "06:30", "08:00", "17:30"] }
+
+  - id: cross-training-legs
+    name: "Cross Training: Legs"
+    duration: 60
+    slots:
+      - { day: Wed, times: ["05:30", "06:30", "08:00", "17:30"] }
+
+  - id: cross-training-back-biceps
+    name: "Cross Training: Back and Biceps"
+    duration: 60
+    slots:
+      - { day: Thu, times: ["05:30", "06:30", "08:00", "17:30"] }
+
+  - id: beast-beatdown-full-body
+    name: "BEAST BEATDOWN: Full Body"
+    duration: 90
+    slots:
+      - { day: Sat, times: ["06:00"] }
+
+# ---------------------------------------------------------------------------
+# Holiday handling. Three behaviours, all observed in your existing calendar:
+#
+#   closed   -> no classes at all; calendar shows a closure notice
+#   special  -> normal schedule suppressed, replaced by ONE special session
+#   observed -> holiday shown as a label, normal schedule runs as usual
+#
+# Holiday DATES come from the shared holidays package, not from this file.
+# ---------------------------------------------------------------------------
+
+holidays:
+  # --- Confirmed from existing BEAST BEATDOWN holiday events ---
+  mlk-day:
+    behavior: special
+    session: { name: "BEAST BEATDOWN: MLK Day", time: "07:00", duration: 90 }
+  memorial-day:
+    behavior: special
+    session: { name: "BEAST BEATDOWN: Memorial Day", time: "07:00", duration: 90 }
+  independence-day:
+    behavior: special
+    session: { name: "BEAST BEATDOWN: Independence Day", time: "07:00", duration: 90 }
+  labor-day:
+    behavior: special
+    session: { name: "BEAST BEATDOWN: Labor Day", time: "07:00", duration: 90 }
+  black-friday:
+    behavior: special
+    session: { name: "BEAST BEATDOWN: Turkey Burner", time: "07:00", duration: 90 }
+
+  # --- Full closures ---
+  thanksgiving:   { behavior: closed }
+  christmas-eve:  { behavior: closed }
+  christmas-day:  { behavior: closed }
+  new-years-eve:  { behavior: closed }
+  new-years-day:  { behavior: closed }
+
+  # --- REVIEW: these exist as all-day markers in the export, but a gym is
+  #     unlikely to actually close for them. Set to `observed` if you stay open.
+  presidents-day:          { behavior: closed }   # TODO confirm
+  indigenous-peoples-day:  { behavior: closed }   # TODO confirm
+  veterans-day:            { behavior: closed }   # TODO confirm
+  halloween:               { behavior: closed }   # TODO confirm — not in holidays.json

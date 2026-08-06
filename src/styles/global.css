@@ -1,0 +1,467 @@
+/* ---------------------------------------------------------------------------
+   Beast Fitness — design system
+
+   Carried over from the twentytwenty-child-3 theme:
+
+     Black Ops One   the brand — site title and primary nav
+     Roboto          titles and body copy
+     grass.png       719x719 tile (lossless WebP, 60% smaller, pixel-identical)
+     #8BC34A         buttons
+     #4CAF50         links and borders
+     #31861b         event titles
+     #79e408         accent / today
+
+   Indie Flower was @import-ed by the old theme but applied to no selector at
+   all — it cost every visitor a Google Fonts round trip to render nothing.
+   Not carried over.
+
+   THEMES
+   The page follows the device — `prefers-color-scheme`, no toggle and no
+   stored preference. That means no flash-of-wrong-theme script is needed:
+   the browser resolves it before first paint on its own.
+
+   The masthead is the exception. It is always black in both themes, because
+   the logo artwork is white-on-black and the brand reads as a dark bar. Its
+   tokens are prefixed --header-* and deliberately sit outside the media
+   query.
+
+   The grass is the constant. Light shows it as it is; dark lays a veil over
+   it and flips the type.
+--------------------------------------------------------------------------- */
+
+/* Self-hosted rather than @import from fonts.googleapis.com: one fewer
+   third-party connection, no visitor IP handed to Google, and it cannot break
+   if that CDN is blocked. */
+@font-face {
+  font-family: 'Black Ops One';
+  src: url('/fonts/black-ops-one.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* One variable file covers the whole weight range — Google serves the same
+   woff2 for 400 and 700, so shipping both would have been the same bytes
+   twice. */
+@font-face {
+  font-family: 'Roboto';
+  src: url('/fonts/roboto.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --green: #8bc34a;
+  --green-mid: #4caf50;
+  --green-dark: #31861b;
+  --green-bright: #79e408;
+
+  --brand: 'Black Ops One', Impact, sans-serif;
+  --display: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --body: var(--display);
+
+  --shadow: 2px 2px 4px 2px rgba(0, 0, 0, 0.4);
+  --measure: 68rem;
+  --nav-h: 4rem;
+}
+
+/* --- the masthead: always black, in both themes -------------------------- */
+:root {
+  --header-bg: rgba(10, 10, 10, 0.94);
+  --header-text: #fff;
+  --header-muted: rgba(255, 255, 255, 0.66);
+
+  /* Decorative dividers — low contrast is fine, they carry no meaning. */
+  --header-hairline: rgba(255, 255, 255, 0.14);
+
+  /* The boundary of an interactive control. WCAG 1.4.11 wants 3:1 against
+     the background; at 0.14 this measured 1.42:1, so it is deliberately
+     stronger than the dividers rather than sharing their token. */
+  --header-control: rgba(255, 255, 255, 0.4);
+}
+
+/* --- light: the grass as it is ------------------------------------------ */
+:root {
+  color-scheme: light;
+
+  --bg: #eef2e8;
+  --text: #14180f;
+  --text-muted: #4a5243;
+  /* 5.25:1 on --bg. #2f7d1f measured 4.54:1 — passing, but with no margin
+     for the smaller type this is used on. */
+  --link: #2b721c;
+  --link-hover: #1d5a10;
+
+  /* --panel sits on the grass; --surface sits on the panel.
+
+     These must differ by enough to see. An earlier pass had the panel at
+     rgba(255,255,255,.9) and surfaces at #fff — white cards on a white panel,
+     invisible in daylight while dark mode looked fine, because there the two
+     tokens genuinely differed. The panel is now tinted so white cards read as
+     raised against it. */
+  --panel: rgba(217, 225, 203, 0.94);
+  --surface: #fff;
+  --surface-2: #f3f6ef;
+  --hairline: rgba(0, 0, 0, 0.18);
+
+  /* Boundary for an interactive surface — a list row or a card. Measured at
+     3.03:1 on white, which clears the 3:1 WCAG 1.4.11 asks of a control's
+     edge. Light-on-light fills can only ever differ by ~1.4:1, so the border
+     is what actually delineates these, not the fill. */
+  --edge: rgba(0, 0, 0, 0.42);
+
+  /* A light wash keeps the tile from overpowering text set on it. */
+  --grass-veil: rgba(255, 255, 255, 0.28);
+  --hero-text: #fff;
+  --hero-halo: 0 1px 50px #000, 0 0 17px #000, 0 0 8px #000;
+
+  --danger: #a52018;
+  --cell-closed: rgba(180, 60, 50, 0.16);
+  --cell-special: rgba(90, 170, 40, 0.22);
+}
+
+/* --- dark: the original look, a veil over the grass ----------------------
+   Follows the device. No toggle, nothing stored, so the browser resolves it
+   before first paint and there is nothing to flash. --header-* is absent
+   here on purpose: the masthead does not change. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --bg: #0a0a0a;
+    --text: #fff;
+    --text-muted: rgba(255, 255, 255, 0.72);
+    --link: var(--green-mid);
+    --link-hover: var(--green-bright);
+
+    --panel: rgba(0, 0, 0, 0.72);
+    --surface: rgba(32, 32, 32, 0.94);
+    --surface-2: rgba(0, 0, 0, 0.45);
+    --hairline: rgba(255, 255, 255, 0.12);
+    --edge: rgba(255, 255, 255, 0.34);
+
+    --grass-veil: rgba(0, 0, 0, 0.62);
+
+    --danger: #ff8a80;
+    --cell-closed: rgba(60, 0, 0, 0.6);
+    --cell-special: rgba(0, 50, 10, 0.7);
+    --shadow: 2px 2px 4px 2px rgba(0, 0, 0, 0.75);
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-padding-top: calc(var(--nav-h) + 1rem);
+}
+
+/* A column the height of the viewport, so a short page still pushes the
+   footer to the bottom of the screen instead of leaving it floating
+   mid-page. `main` takes the slack. 100dvh rather than 100vh so mobile
+   browser chrome collapsing does not cause a jump. */
+body {
+  margin: 0;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--body);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The grass, on every page. The veil is a gradient layered over the tile
+   rather than a separate element, so it scrolls and repeats with it. Natural
+   size and `left top` as before — rescaling the 719px tile changes how big
+   the blades read and it stops looking like the old site. */
+body {
+  background-image: linear-gradient(var(--grass-veil), var(--grass-veil)), url('/grass.webp');
+  background-position: left top;
+  background-size: auto;
+  background-repeat: repeat;
+  background-attachment: scroll;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--display);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+h1 {
+  font-size: clamp(2rem, 6vw, 3.25rem);
+  line-height: 1.08;
+  margin: 0 0 1rem;
+}
+
+/* Page titles set in the masthead face. Lives here rather than in a scoped
+   component style so it beats the bare `h1` rule above on specificity
+   regardless of stylesheet order. Black Ops One ships a single weight, so the
+   400 is explicit — inheriting the 700 above would make the browser
+   synthesise a fake bold. */
+.brand-title {
+  font-family: var(--brand);
+  font-weight: 400;
+  letter-spacing: 0;
+  margin: 0;
+}
+
+h2 {
+  font-size: clamp(1.4rem, 4vw, 2rem);
+  line-height: 1.15;
+  margin: 2.5rem 0 1rem;
+}
+
+a {
+  color: var(--link);
+}
+
+a:hover,
+a:focus-visible {
+  color: var(--link-hover);
+}
+
+/* --- layout -------------------------------------------------------------- */
+
+/* --- page width ------------------------------------------------------------
+   One scale, three steps, set once per page by Base.astro as data-width on
+   <html>. Header, main and footer all read the same custom property, so the
+   masthead can never be a different width from the content under it — which
+   is exactly what had drifted: prose pages at 68rem, training at 78, contact
+   at 82, each with a 68rem header regardless.
+
+   Pick by what the page holds, not by how it looks:
+     prose  reading width, ~75 characters. The default.
+     wide   anything that is not a single column of prose — a main column
+            plus a side column, a product table, the schedule grid.
+--------------------------------------------------------------------------- */
+:root {
+  --page-max: var(--measure);
+}
+[data-width='wide'] {
+  --page-max: 82rem;
+}
+
+.wrap {
+  max-width: var(--page-max);
+  margin-inline: auto;
+  padding-inline: 1.25rem;
+}
+
+/* The masthead and the footer are the same furniture on every page, so they
+   keep ONE width regardless of what the content under them is doing. Letting
+   --page-max drag them around gave the nav three different widths — 68rem on
+   the home page, 82 on training, full-bleed on the schedule — which reads as
+   the site coming apart as you move through it.
+
+   82rem so the widest content pages line up exactly. Prose pages get a nav a
+   little wider than their column, and the schedule gets a contained nav over
+   a full-bleed grid; both are deliberate, and both are STABLE, which is the
+   thing that actually matters when you click between pages. */
+.site-header > .wrap,
+.site-footer > .wrap {
+  max-width: 82rem;
+}
+
+/* Takes the leftover height so the footer lands at the bottom.
+
+   width:100% is load-bearing. `main` is a flex item of the body column and
+   .wrap gives it `margin-inline: auto` — an auto margin on the cross axis
+   suppresses stretch, so without an explicit width the element shrink-to-fits
+   its contents. That is invisible while a max-width is set and prose overflows
+   it, and it collapses the page the moment --page-max is none. With width:100%
+   the auto margins still centre the box whenever max-width caps it. */
+main {
+  flex: 1 0 auto;
+  width: 100%;
+  padding-block: 2rem 4rem;
+}
+
+/* Inner pages get a surface to sit on. Measured against the actual grass
+   tile: prose directly on it fails AA across 21% of the tile for body text
+   and 85% for muted text in light mode. With this panel, both clear AA over
+   100% of the tile, worst case 7.1:1.
+
+   The home page deliberately opts out — its copy is the big centred text with
+   the triple-shadow halo, which is designed to sit on the grass itself. */
+main.panel {
+  background: var(--panel);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow);
+  padding: 2rem 1.75rem 3rem;
+  margin-block: 1.5rem 3rem;
+}
+
+@media (max-width: 34rem) {
+  main.panel {
+    padding: 1.25rem 1rem 2rem;
+  }
+}
+
+/* --- the home page voice -------------------------------------------------
+   Body copy on the home page sits directly on the grass, so it is large,
+   centred, and wrapped in a triple text-shadow that acts as a halo. Without
+   all three shadows it loses legibility over the lighter blades. This is the
+   single most recognisable thing about the old design, and it is kept in both
+   themes because it works on both.
+------------------------------------------------------------------------- */
+
+.home-copy p {
+  color: var(--hero-text);
+  padding-top: 1em;
+  font-weight: 700;
+  font-size: clamp(1.25rem, 4vw, 2em);
+  text-align: center;
+  line-height: 1.05;
+  text-shadow: var(--hero-halo);
+}
+
+/* --- components ---------------------------------------------------------- */
+
+.btn {
+  display: inline-block;
+  background-color: var(--green);
+  color: #0a0a0a;
+  font-family: var(--display);
+  font-weight: 700;
+  text-decoration: none;
+  padding: 0.7rem 1.4rem;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.btn:hover,
+.btn:focus-visible {
+  background-color: var(--green-bright);
+  color: #0a0a0a;
+}
+
+.btn.ghost {
+  background: transparent;
+  color: var(--link);
+  border: 1px solid currentColor;
+}
+
+.btn.ghost:hover,
+.btn.ghost:focus-visible {
+  background: var(--green);
+  color: #0a0a0a;
+  border-color: var(--green);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow);
+  border-radius: 6px;
+  padding: 1.5rem;
+}
+
+.site-footer {
+  margin-top: auto;
+  padding-block: 1.75rem;
+  font-size: 0.9rem;
+  text-align: center;
+
+  /* Same tokens as the masthead — black in both themes. */
+  background: var(--header-bg);
+  border-top: 1px solid var(--header-hairline);
+  color: var(--header-muted);
+}
+
+.site-footer p {
+  margin: 0.25rem 0;
+}
+
+.footer-addr {
+  color: var(--header-text);
+  opacity: 0.9;
+}
+
+.footer-addr a {
+  color: var(--green);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.footer-addr a:hover,
+.footer-addr a:focus-visible {
+  color: var(--green-bright);
+  text-decoration: underline;
+}
+
+.footer-copyright {
+  color: var(--header-muted);
+  font-size: 0.85rem;
+}
+
+.footer-by {
+  color: var(--header-text);
+  opacity: 0.85;
+}
+
+.footer-by a {
+  color: var(--green);
+  text-decoration: none;
+}
+
+.footer-by a:hover,
+.footer-by a:focus-visible {
+  color: var(--green-bright);
+  text-decoration: underline;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+:focus-visible {
+  outline: 3px solid var(--green-bright);
+  outline-offset: 2px;
+}
+
+/* Available to assistive tech and to search engines, but not painted.
+   Used for the home page's <h1>, where the visible heading is the logo. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Skip link — the nav is the first thing in the tab order otherwise. */
+.skip {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--green);
+  color: #0a0a0a;
+  padding: 0.6rem 1rem;
+  z-index: 100;
+  border-radius: 0 0 4px 0;
+}
+
+.skip:focus {
+  left: 0;
+}

@@ -1,0 +1,29 @@
+# ---------------------------------------------------------------------------
+# Home page copy
+#
+# Everything the home page says lives here. Edit this file and push — no
+# component, layout or stylesheet needs touching.
+# ---------------------------------------------------------------------------
+
+hero:
+  # Each entry is one paragraph of the big centred copy over the grass.
+  # Keep them short: this text is set very large and carries a heavy shadow
+  # so it can sit on a photograph, and long paragraphs stop reading as a
+  # statement and start reading as a wall.
+  - >-
+    Is your goal to shed weight, gain lean muscle, get shredded, maintain your
+    current physique, or meet other people who like a challenge?
+
+# The last thing on the page, under the photographs. The hero opens with the
+# question; this closes with the answer.
+closing: >-
+  You've come to the right place whether you are a beginner, a weekend
+  warrior, or an experienced athlete.
+
+headings:
+  next: Up next
+  training: Train with us
+  gallery: At the gym
+
+# Prices are NOT listed here. The home page reads data/training.yaml and shows
+# the cheapest option in each product, so the two can never disagree.

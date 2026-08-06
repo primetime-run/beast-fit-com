@@ -1,0 +1,51 @@
+# ---------------------------------------------------------------------------
+# Trainers
+#
+# Migrated from the WordPress "organizer" records the old Trainers page listed
+# via [list_organizers]. The export also held Manny, Ashley (slug /talia/),
+# Bella and Keslee as published, plus Brandon and Nicole as drafts — they are
+# not on the new site. Their photos remain in the migration archive if anyone
+# needs them back.
+#
+# `photo` is a filename in src/assets/trainers/.
+# ---------------------------------------------------------------------------
+
+trainers:
+  - id: kevin
+    name: Kevin Morgan
+    role: Owner &amp; Head Coach
+    photo: kevin.jpg
+    email: kevin@beast-fit.com
+    motto: All or Nothing.
+    hometown: Brooklyn, NY
+    college: Bernard M. Baruch College, New York, NY
+    certifications:
+      - ACE Certified Personal Trainer
+      - ACE Fitness Nutrition Specialist
+      - ACE Youth Fitness Specialist
+      - Kettlebell Level 1
+      - TRX-FTC
+    specialties:
+      - Strength &amp; conditioning
+      - Sports conditioning
+      - Weight management
+      - Youth fitness
+      - Geriatric fitness
+      - Group exercise instruction
+    quote: >-
+      I am passionate, driven, and determined to help my clients achieve their
+      goals. I love helping people surpass their physical, mental and spiritual
+      threshold. Every day is a step closer to becoming and achieving greatness.
+    bio:
+      - >-
+        Kevin Morgan is the owner of B.E.A.S.T Fitness. A Brooklyn, New York
+        native, he believes in an "All or Nothing" philosophy. Fitness
+        literally saved his life.
+      - >-
+        As a youth he grew up overweight, which had an impact on his life
+        physically, mentally, emotionally and spiritually. Today he is a
+        personal trainer, fitness nutrition specialist, youth fitness
+        specialist, certified fitness coach and group fitness instructor —
+        paying forward the thing he is most passionate about, which is pushing
+        everyone past their mental, physical and spiritual threshold to become
+        healthier, stronger versions of themselves.

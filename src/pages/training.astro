@@ -1,0 +1,178 @@
+---
+import Base from '../layouts/Base.astro'
+import { training, fromPrice, money } from '../lib/data'
+
+/*
+  The Training index. Each product also has its own page at the address it
+  had on WordPress (/membership-plans/, /drop-in/, /personal-training/), so
+  anything already linking to those keeps working — see [product].astro.
+*/
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'ItemList',
+  name: 'Training options at BEAST Fitness',
+  itemListElement: training.products.map((p, i) => ({
+    '@type': 'ListItem',
+    position: i + 1,
+    name: p.name,
+    url: `https://beast-fit.com${p.url}`,
+  })),
+}
+---
+
+<Base
+  title="Training — BEAST Fitness"
+  description="Memberships, drop-in classes and personal training at BEAST Fitness in Delray Beach, Florida."
+  jsonLd={jsonLd}
+  width="wide"
+>
+  <h1 class="brand-title page-title">Training</h1>
+  <p class="lede">
+    Three ways to train with us. Class times are on the <a href="/schedule/">schedule</a>,
+    and you can <a href="/trainers/">meet the trainers</a>.
+  </p>
+
+  <ul class="products">
+    {
+      training.products.map((p) => (
+        <li class="product">
+          <div class="p-head">
+            <h2>{p.name}</h2>
+            <p class="p-from">
+              <span class="from">from</span>
+              <span class="amount">{money(fromPrice(p))}</span>
+            </p>
+          </div>
+
+          <p class="p-summary">{p.summary}</p>
+
+          <ul class="p-options">
+            {p.options.map((o) => (
+              <li class={o.highlight ? 'is-highlight' : undefined}>
+                <span class="o-label">{o.label}</span>
+                <span class="o-price">
+                  {o.was && <s class="o-was">{money(o.was)}</s>}
+                  {money(o.price)}
+                </span>
+                {o.note && <span class="o-note">{o.note}</span>}
+              </li>
+            ))}
+          </ul>
+
+          <p class="p-more">
+            <a class="btn" href={p.url}>{p.name} details</a>
+          </p>
+        </li>
+      ))
+    }
+  </ul>
+
+  <section class="meet">
+    <h2 class="brand-title sub">Who you train with</h2>
+    <p>
+      Every class and session is run by our own coaches.
+      <a href="/trainers/">Meet the trainers</a>.
+    </p>
+  </section>
+
+  <p class="ask">
+    Not sure which fits? <a href="/contact/?topic=other">Ask us</a> — we will point you at the
+    right one.
+  </p>
+</Base>
+
+<style>
+  .page-title { font-size: clamp(2rem, 6vw, 3rem); text-transform: uppercase; }
+  .lede { color: var(--text-muted); max-width: 44rem; margin-top: .5rem; }
+
+  .products {
+    list-style: none; margin: 2rem 0 0; padding: 0;
+    display: grid; gap: 1.25rem;
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  /* Two up once there is room, three across on a desktop. Explicit rather
+     than auto-fit, which left the last card stretched across a whole row on
+     its own at in-between widths. Cards stretch to equal height so the
+     "details" button lines up across all three. */
+  @media (min-width: 44rem) {
+    .products { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  @media (min-width: 64rem) {
+    .products { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.5rem; }
+  }
+
+  .product {
+    background: var(--surface);
+    border: 1px solid var(--edge);
+    border-top: 3px solid var(--green);
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .p-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: .75rem; flex-wrap: wrap;
+    border-bottom: 2px solid var(--hairline);
+    padding-bottom: .6rem;
+  }
+  .p-head h2 {
+    margin: 0; font-family: var(--brand); font-weight: 400;
+    font-size: 1.1rem; text-transform: uppercase; letter-spacing: .03em;
+  }
+  .p-from { margin: 0; display: flex; align-items: baseline; gap: .3rem; }
+  .from { font-size: .6rem; text-transform: uppercase; letter-spacing: .1em; color: var(--text-muted); }
+  .amount {
+    font-family: var(--brand); font-size: 1.5rem; line-height: 1;
+    color: var(--link); font-variant-numeric: tabular-nums;
+  }
+
+  .p-summary { color: var(--text-muted); font-size: .9rem; margin: .85rem 0 1rem; }
+
+  .p-options { list-style: none; margin: 0 0 1.25rem; padding: 0; display: grid; gap: 2px; }
+  .p-options li {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: .5rem .75rem;
+    align-items: baseline;
+    padding: .5rem .6rem;
+    background: var(--surface-2);
+    border-left: 3px solid transparent;
+  }
+  .p-options li.is-highlight {
+    border-left-color: var(--green);
+    background: color-mix(in srgb, var(--green) 12%, var(--surface-2));
+  }
+  .o-label { font-size: .92rem; }
+  .o-price {
+    font-family: var(--brand); font-variant-numeric: tabular-nums;
+    color: var(--link); white-space: nowrap;
+  }
+  .o-was { color: var(--text-muted); font-family: var(--body); font-size: .78rem; margin-right: .35rem; }
+  .o-note {
+    grid-column: 1 / -1;
+    font-size: .72rem; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--text-muted);
+  }
+
+  .p-more { margin: auto 0 0; }
+  .p-more .btn { width: 100%; text-align: center; }
+
+  .meet {
+    margin-top: 2.5rem;
+    padding: 1.15rem 1.25rem;
+    background: var(--surface);
+    border: 1px solid var(--edge);
+    border-left: 3px solid var(--green);
+  }
+  .meet .sub {
+    font-size: .9rem; text-transform: uppercase; margin: 0 0 .35rem;
+  }
+  .meet p { margin: 0; color: var(--text-muted); }
+
+  .ask { margin-top: 1.5rem; color: var(--text-muted); }
+</style>

@@ -1,0 +1,90 @@
+{
+  "membership": {
+    "name": "Membership",
+    "url": "/membership-plans/",
+    "options": {
+      "limited-1-month": {
+        "label": "Limited — 1 month",
+        "cents": 6000
+      },
+      "limited-1-month-twice-a-week": {
+        "label": "Limited — 1 month, twice a week",
+        "cents": 9900
+      },
+      "membership-1-month": {
+        "label": "Membership — 1 month",
+        "cents": 12900
+      },
+      "membership-3-months": {
+        "label": "Membership — 3 months",
+        "cents": 36600
+      },
+      "membership-6-months": {
+        "label": "Membership — 6 months",
+        "cents": 71400
+      },
+      "membership-1-year": {
+        "label": "Membership — 1 year",
+        "cents": 138000
+      }
+    }
+  },
+  "drop-in": {
+    "name": "Drop In",
+    "url": "/drop-in/",
+    "options": {
+      "1-class": {
+        "label": "1 class",
+        "cents": 2000
+      },
+      "1-week-pass": {
+        "label": "1 week pass",
+        "cents": 7500
+      },
+      "1-month-pass": {
+        "label": "1 month pass",
+        "cents": 13900
+      }
+    }
+  },
+  "personal-training": {
+    "name": "Personal Training",
+    "url": "/personal-training/",
+    "options": {
+      "30-minutes": {
+        "label": "30 minutes",
+        "cents": 5000
+      },
+      "45-minutes": {
+        "label": "45 minutes",
+        "cents": 7500
+      },
+      "60-minutes": {
+        "label": "60 minutes",
+        "cents": 9900
+      },
+      "30-minutes-x-10": {
+        "label": "30 minutes × 10",
+        "cents": 45000
+      },
+      "45-minutes-x-10": {
+        "label": "45 minutes × 10",
+        "cents": 65000
+      },
+      "60-minutes-x-10": {
+        "label": "60 minutes × 10",
+        "cents": 85000
+      }
+    }
+  },
+  "test": {
+    "name": "Test charge",
+    "url": "/checkout/test/",
+    "options": {
+      "one-dollar": {
+        "label": "$1.00 test charge",
+        "cents": 100
+      }
+    }
+  }
+}

@@ -1,0 +1,182 @@
+---
+/*
+  The checkout overlay.
+
+  Card fields are served by Authorize.Net inside the iframe below. Nothing in
+  this component — and nothing anywhere on this site — may read, store or
+  forward a card number. That boundary is what keeps the merchant in PCI
+  SAQ A. If you find yourself adding an input for a card here, stop.
+
+  Flow:
+    1. Button posts {product, option} to the Lambda. No price: see the note in
+       infra/lambda/index.mjs.
+    2. Lambda returns a single-use form token.
+    3. We POST that token to Authorize.Net, targeting the iframe.
+    4. The iframe talks back through /checkout/communicator/.
+*/
+
+const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
+---
+
+<dialog class="checkout" data-checkout aria-label="Payment">
+  <button type="button" class="x" data-checkout-close aria-label="Close payment">×</button>
+
+  <p class="status" data-checkout-status>Loading payment form…</p>
+
+  {/* name is what the POST targets; Authorize.Net renders into it. */}
+  <iframe
+    name="authnet"
+    data-checkout-frame
+    title="Secure payment form"
+    frameborder="0"
+    scrolling="no"
+  ></iframe>
+
+  {/* Built and submitted by script. Kept in the DOM rather than created ad hoc
+      so the target/iframe relationship is visible when debugging. */}
+  <form
+    method="post"
+    target="authnet"
+    action=""
+    data-checkout-form
+    hidden
+  >
+    <input type="hidden" name="token" data-checkout-token />
+  </form>
+</dialog>
+
+<script define:vars={{ endpoint }}>
+  const dlg = document.querySelector('[data-checkout]')
+  if (dlg) {
+    const frame = dlg.querySelector('[data-checkout-frame]')
+    const form = dlg.querySelector('[data-checkout-form]')
+    const tokenField = dlg.querySelector('[data-checkout-token]')
+    const status = dlg.querySelector('[data-checkout-status]')
+
+    const setStatus = (msg) => {
+      status.textContent = msg
+      status.hidden = !msg
+    }
+
+    const close = () => {
+      dlg.close()
+      // Blank the frame so a closed overlay is never holding a live payment
+      // session, and so reopening always starts clean.
+      frame.src = 'about:blank'
+      frame.style.height = ''
+    }
+
+    dlg.querySelector('[data-checkout-close]').addEventListener('click', close)
+    dlg.addEventListener('cancel', (e) => {
+      e.preventDefault()
+      close()
+    })
+
+    async function open(product, option) {
+      setStatus('Loading payment form…')
+      frame.style.height = ''
+      dlg.showModal()
+
+      if (!endpoint) {
+        setStatus('Checkout is not configured yet. Please call or use the contact form.')
+        return
+      }
+
+      let data
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ product, option }),
+        })
+        data = await res.json()
+        if (!res.ok) throw new Error(data.error ?? res.status)
+      } catch (err) {
+        console.error('checkout', err)
+        setStatus('Sorry — we could not start the payment. Please try again, or contact us.')
+        return
+      }
+
+      setStatus('')
+      form.action = data.action
+      tokenField.value = data.token
+      form.submit()
+    }
+
+    /* Anything with data-buy opens the overlay. The attributes carry the
+       catalog keys, not prices. */
+    for (const el of document.querySelectorAll('[data-buy]')) {
+      el.addEventListener('click', (e) => {
+        e.preventDefault()
+        open(el.dataset.product, el.dataset.option)
+      })
+    }
+
+    /* Messages arrive from /checkout/communicator/, which is same-origin, so
+       anything from another origin is discarded outright. */
+    window.addEventListener('message', (e) => {
+      if (e.origin !== window.location.origin) return
+      if (typeof e.data !== 'string') return
+
+      const params = new URLSearchParams(e.data)
+      const action = params.get('action')
+
+      if (action === 'resizeWindow') {
+        const h = parseInt(params.get('height'), 10)
+        if (Number.isFinite(h) && h > 0) frame.style.height = h + 'px'
+      } else if (action === 'cancel') {
+        close()
+      } else if (action === 'transactResponse') {
+        /* The response is informational only — it comes from the browser and
+           must never be treated as proof of payment. Settlement is confirmed
+           server-side by the webhook before anything is fulfilled. */
+        close()
+        window.location.href = '/checkout/thank-you/'
+      }
+    })
+  }
+</script>
+
+<style>
+  .checkout {
+    border: 1px solid var(--edge);
+    border-top: 3px solid var(--green);
+    border-radius: 0;
+    background: var(--surface);
+    padding: 0;
+    width: min(94vw, 34rem);
+    max-height: 92vh;
+    overflow: auto;
+  }
+  .checkout::backdrop { background: rgba(0, 0, 0, 0.7); }
+
+  .x {
+    position: sticky;
+    top: 0;
+    margin-left: auto;
+    display: block;
+    background: transparent;
+    border: 0;
+    color: var(--text);
+    font-size: 1.6rem;
+    line-height: 1;
+    padding: 0.4rem 0.7rem;
+    cursor: pointer;
+  }
+
+  .status {
+    margin: 0;
+    padding: 1.5rem;
+    text-align: center;
+    color: var(--text-muted);
+  }
+  .status[hidden] { display: none; }
+
+  iframe {
+    display: block;
+    width: 100%;
+    /* Grows to whatever the hosted form reports via resizeWindow. */
+    height: 0;
+    border: 0;
+  }
+</style>

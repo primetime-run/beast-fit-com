@@ -1,0 +1,40 @@
+# ---------------------------------------------------------------------------
+# Where the gym is.
+#
+# From the WordPress venue record used by 4,908 of the 4,948 events — the one
+# classes actually run at. A second venue existed (Delray Seacrest Soccer
+# Complex, 240 SE 2nd Ave) with no events attached and its map switched off;
+# it is not carried over.
+#
+# COORDINATES
+#
+# NOT the ones from the WordPress export. That record was auto-geocoded
+# (_VenueOverwriteCoords was 0) and sat at 26.4892962, -80.0678377 — 346 m
+# (~1,136 ft) east of the street address, out past Seacrest Blvd. Apple Maps
+# navigates to a literal lat/lng, so it was routing people to the wrong side
+# of the block.
+#
+# These are geocoded from the postal address itself and land on Seacrest Blvd.
+# If the field entrance is somewhere other than the street address, change
+# them here — the maps links, the structured data and the static map image all
+# read from this one place.
+# ---------------------------------------------------------------------------
+
+name: Seacrest Soccer Complex
+street: 2505 Seacrest Blvd
+city: Delray Beach
+state: FL
+zip: "33444"
+country: US
+lat: 26.4885477
+lng: -80.0712163
+
+# Sits directly under the address. This is wayfinding, not a general note —
+# the field is set back from the road, so the landmarks are how people
+# actually find it.
+landmark: Behind Aquacrest Pool and behind Plumosa School of the Arts.
+
+# Shown beneath the landmark. Keep it practical.
+notes:
+  - We train outdoors on the field — rain or shine.
+  - Parking is on site.

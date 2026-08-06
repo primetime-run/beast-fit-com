@@ -1,0 +1,159 @@
+---
+import { Image } from 'astro:assets'
+import Base from '../layouts/Base.astro'
+import { trainers } from '../lib/data'
+
+/*
+  Replaces the WordPress [list_organizers] shortcode, which pulled from The
+  Events Calendar's "organizer" records. Photos are imported eagerly so Astro
+  can optimise them; the data file only names the file.
+*/
+const photos = import.meta.glob<{ default: ImageMetadata }>(
+  '../assets/trainers/*.{jpg,jpeg,png,webp}',
+  { eager: true }
+)
+
+const list = trainers.trainers.map((t) => ({
+  ...t,
+  image: photos[`../assets/trainers/${t.photo}`]?.default,
+}))
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'ItemList',
+  name: 'Trainers at BEAST Fitness',
+  itemListElement: list.map((t, i) => ({
+    '@type': 'ListItem',
+    position: i + 1,
+    item: {
+      '@type': 'Person',
+      name: t.name,
+      jobTitle: t.role.replace(/&amp;/g, '&'),
+      worksFor: { '@type': 'ExerciseGym', name: 'BEAST Fitness' },
+    },
+  })),
+}
+---
+
+<Base
+  title="Trainers — BEAST Fitness"
+  description="Meet the team at BEAST Fitness in Delray Beach, Florida."
+  jsonLd={jsonLd}
+>
+  <h1 class="brand-title page-title">Trainers</h1>
+  <p class="lede">Who you will be training with.</p>
+
+  {
+    list.map((t) => (
+      <article class="trainer">
+        {t.image && (
+          <div class="t-photo">
+            <Image
+              src={t.image}
+              alt={`${t.name}, ${t.role.replace(/&amp;/g, '&')} at BEAST Fitness`}
+              widths={[320, 640]}
+              sizes="(min-width: 52rem) 20rem, 60vw"
+              loading="eager"
+            />
+          </div>
+        )}
+
+        <div class="t-body">
+          <h2 class="brand-title">{t.name}</h2>
+          <p class="t-role" set:html={t.role} />
+
+          {t.quote && <blockquote class="t-quote">{t.quote}</blockquote>}
+
+          {t.bio.map((p) => <p>{p}</p>)}
+
+          <dl class="t-facts">
+            {t.motto && (<><dt>Motto</dt><dd>“{t.motto}”</dd></>)}
+            {t.hometown && (<><dt>Hometown</dt><dd>{t.hometown}</dd></>)}
+            {t.college && (<><dt>College</dt><dd>{t.college}</dd></>)}
+            <dt>Certifications</dt>
+            <dd>
+              <ul class="tags">{t.certifications.map((c) => <li set:html={c} />)}</ul>
+            </dd>
+            <dt>Specialties</dt>
+            <dd>
+              <ul class="tags">{t.specialties.map((s) => <li set:html={s} />)}</ul>
+            </dd>
+          </dl>
+
+          <p class="t-actions">
+            <a class="btn" href="/contact/?topic=personal-training">Train with {t.name.split(' ')[0]}</a>
+          </p>
+        </div>
+      </article>
+    ))
+  }
+</Base>
+
+<style>
+  .page-title { font-size: clamp(2rem, 6vw, 3rem); text-transform: uppercase; }
+  .lede { color: var(--text-muted); margin-top: .5rem; }
+
+  .trainer {
+    display: grid;
+    gap: 1.5rem;
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 2px solid var(--hairline);
+  }
+  .trainer:first-of-type { border-top: 0; padding-top: 0; }
+
+  @media (min-width: 52rem) {
+    .trainer { grid-template-columns: 20rem minmax(0, 1fr); gap: 2.5rem; align-items: start; }
+    .t-photo { position: sticky; top: calc(var(--nav-h) + 1.5rem); }
+  }
+
+  .t-photo :global(img) {
+    display: block; width: 100%; height: auto;
+    border: 1px solid var(--edge);
+    border-top: 3px solid var(--green);
+    box-shadow: var(--shadow);
+  }
+
+  .t-body h2 { margin: 0; font-size: 1.6rem; text-transform: uppercase; }
+  .t-role {
+    margin: .2rem 0 1rem;
+    font-family: var(--body); font-size: .74rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .07em;
+    color: var(--link);
+  }
+
+  .t-quote {
+    margin: 0 0 1.25rem;
+    padding: .75rem 0 .75rem 1rem;
+    border-left: 3px solid var(--green);
+    font-size: 1.05rem;
+    font-style: italic;
+    color: var(--text);
+  }
+  .t-quote::before { content: '\201C'; }
+  .t-quote::after { content: '\201D'; }
+
+  .t-facts {
+    display: grid; gap: .35rem .9rem;
+    margin: 1.5rem 0 0;
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 34rem) { .t-facts { grid-template-columns: auto minmax(0, 1fr); } }
+  .t-facts dt {
+    font-family: var(--body); font-size: .68rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .07em;
+    color: var(--text-muted);
+    padding-top: .2rem;
+  }
+  .t-facts dd { margin: 0 0 .4rem; }
+
+  .tags { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .35rem; }
+  .tags li {
+    font-size: .78rem;
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
+    padding: .15rem .5rem;
+  }
+
+  .t-actions { margin-top: 1.75rem; }
+</style>

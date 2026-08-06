@@ -1,0 +1,26 @@
+{
+  "name": "beast-fit-com",
+  "type": "module",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "astro dev",
+    "build": "node scripts/generate-catalog.mjs && astro build",
+    "preview": "astro preview",
+    "verify-urls": "node scripts/verify-urls.mjs",
+    "schedule": "node scripts/print-schedule.ts",
+    "verify-holidays": "node scripts/verify-holidays.ts",
+    "generate-map": "node scripts/generate-map.mjs",
+    "dev:checkout": "node scripts/dev-checkout.mjs",
+    "generate-catalog": "node scripts/generate-catalog.mjs"
+  },
+  "dependencies": {
+    "@astrojs/sitemap": "^3.2.1",
+    "astro": "^5.13.0",
+    "yaml": "^2.6.0"
+  },
+  "devDependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1101.0",
+    "@aws-sdk/client-sesv2": "^3.1101.0"
+  }
+}

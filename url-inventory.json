@@ -1,0 +1,11 @@
+[
+  { "from": "/", "title": "Home", "note": "WordPress front page (page slug /home/)" },
+  { "from": "/contact/", "title": "Contact", "note": "same address on WordPress" },
+  { "from": "/trainers/", "title": "Trainers", "note": "same address; was [list_organizers]" },
+  { "from": "/privacy-policy/", "title": "Privacy Policy", "note": "same address" },
+  { "from": "/membership-plans/", "title": "Membership", "note": "WooCommerce product" },
+  { "from": "/drop-in/", "title": "Drop In", "note": "WooCommerce product" },
+  { "from": "/personal-training/", "title": "Personal Training", "note": "WooCommerce product" },
+  { "from": "/schedule/", "title": "Schedule", "note": "new; replaces 1,338 /event/ URLs" },
+  { "from": "/training/", "title": "Training", "note": "new; replaces /shop/" }
+]

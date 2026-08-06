@@ -1,0 +1,321 @@
+---
+import '../styles/global.css'
+import logo from '../assets/logo-dark.png'
+import { location, addressLine, directions } from '../lib/data'
+
+interface Props {
+  title: string
+  description: string
+  jsonLd?: Record<string, unknown>
+  /** Keep this page out of search results — receipts and the like. */
+  noindex?: boolean
+  /**
+   * How wide the page runs. Sets --page-max on <html>, which the header, the
+   * content and the footer all read — so the masthead always lines up with
+   * what is underneath it. See the width scale in global.css.
+   *
+   *   prose  reading width (default). Text, anything you read straight down.
+   *   wide   anything that is not a single column of prose — a main column
+   *          plus a side column, a product table, the schedule grid.
+   */
+  width?: 'prose' | 'wide'
+}
+
+const { title, description, jsonLd, noindex, width = 'prose' } = Astro.props
+
+// Normalise away the trailing-slash ambiguity `trailingSlash: 'ignore'`
+// permits, so canonical URLs are stable whichever form was requested.
+const path = Astro.url.pathname.replace(/\/+$/, '') || '/'
+const canonical = new URL(path === '/' ? '/' : `${path}/`, Astro.site).href
+
+const nav = [
+  { href: '/', label: 'Home' },
+  { href: '/schedule/', label: 'Schedule' },
+  // Trainers is reached from the Training page rather than the top nav —
+  // the two words sit badly next to each other and one is a subset of the
+  // other's story.
+  { href: '/training/', label: 'Training' },
+  { href: '/contact/', label: 'Contact' },
+]
+
+const isCurrent = (href: string) =>
+  href === '/' ? path === '/' : path === href.replace(/\/$/, '')
+---
+
+<!doctype html>
+<html lang="en" data-width={width}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
+
+    {/* The page follows the device via prefers-color-scheme. No toggle and
+        nothing stored, so the browser resolves the theme before first paint
+        and there is no flash to script around. */}
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#0a0a0a" />
+
+    <link rel="preload" href="/fonts/roboto.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/black-ops-one.woff2" as="font" type="font/woff2" crossorigin />
+
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" />
+    <link rel="icon" href="/favicon-16.png" sizes="16x16" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="sitemap" href="/sitemap-index.xml" />
+
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="BEAST Fitness" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:image" content={new URL('/og.png', Astro.site).href} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="B.E.A.S.T Fitness — Delray Beach, Florida" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={new URL('/og.png', Astro.site).href} />
+
+    {jsonLd && <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}
+  </head>
+
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+
+    <header class="site-header">
+      <div class="wrap bar">
+        {/* The wordmark carries the name, so there is no text beside it —
+            "Beast Fitness" lives in the alt text instead of being said twice.
+            The artwork is white-on-transparent, which is why the masthead
+            stays black in both themes. */}
+        <a class="site-title" href="/" aria-label="Beast Fitness — home">
+          <img src={logo.src} alt="Beast Fitness" width={logo.width} height={logo.height} />
+        </a>
+
+        <nav class="nav" id="nav" aria-label="Primary">
+          {
+            nav.map((item) => (
+              <a href={item.href} aria-current={isCurrent(item.href) ? 'page' : undefined}>
+                {item.label}
+              </a>
+            ))
+          }
+        </nav>
+
+        <button
+          type="button"
+          class="burger"
+          data-nav-toggle
+          aria-label="Menu"
+          aria-controls="nav"
+          aria-expanded="false"
+        >
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </header>
+
+    {/* The home page sits directly on the grass — its copy carries the
+        triple-shadow halo for legibility. Every other page gets a surface,
+        because prose on the bare tile fails contrast in light mode. */}
+    <main class={path === '/' ? 'wrap' : 'wrap panel'} id="main">
+      <slot />
+    </main>
+
+    {/* Full-bleed black, like the masthead. It sits on the grass rather than
+        on a panel, and muted text directly on the tile fails contrast across
+        most of it in light mode. A solid bar fixes that in both themes and
+        bookends the page. */}
+    <footer class="site-footer">
+      <div class="wrap">
+        <p class="footer-addr">
+          {location.name} · {addressLine()} ·
+          <a href={directions().google} rel="noopener">Get directions</a>
+        </p>
+        <p class="footer-copyright">
+          &copy; {new Date().getFullYear()} BEAST Fitness
+        </p>
+        <p class="footer-by">
+          Powered by <a href="https://mwhayden.net" rel="noopener">mwhayden.net</a>
+        </p>
+      </div>
+    </footer>
+
+    <script>
+      /* Responsive nav only. There is no theme script — the device decides. */
+      const burger = document.querySelector('[data-nav-toggle]') as HTMLButtonElement | null
+      const navEl = document.getElementById('nav')
+
+      function setOpen(open: boolean) {
+        burger?.setAttribute('aria-expanded', String(open))
+        navEl?.classList.toggle('is-open', open)
+        document.body.classList.toggle('nav-open', open)
+      }
+
+      burger?.addEventListener('click', () =>
+        setOpen(burger.getAttribute('aria-expanded') !== 'true')
+      )
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') setOpen(false)
+      })
+
+      navEl?.addEventListener('click', (e) => {
+        if ((e.target as HTMLElement).tagName === 'A') setOpen(false)
+      })
+
+      document.addEventListener('click', (e) => {
+        if (!navEl?.classList.contains('is-open')) return
+        if ((e.target as HTMLElement).closest('.site-header')) return
+        setOpen(false)
+      })
+
+      // Leaving mobile width must never strand the page in the open state.
+      matchMedia('(min-width: 48rem)').addEventListener('change', (m) => {
+        if (m.matches) setOpen(false)
+      })
+    </script>
+
+    <style>
+      /* Always black, in both themes — the logo is white-on-transparent and
+         the brand reads as a dark bar. */
+      .site-header {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        background: var(--header-bg);
+        backdrop-filter: blur(8px);
+        border-bottom: 1px solid var(--header-hairline);
+        color: var(--header-text);
+      }
+
+      .bar {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        min-height: var(--nav-h);
+      }
+
+      .site-title {
+        display: inline-flex;
+        align-items: center;
+        margin-right: auto;
+        line-height: 0;
+      }
+
+      .site-title img {
+        height: 2.2rem;
+        width: auto;
+      }
+
+      .nav {
+        display: flex;
+        gap: 1.5rem;
+        align-items: center;
+      }
+
+      .nav a {
+        font-family: var(--brand);
+        font-size: 0.9rem;
+        color: var(--header-text);
+        text-decoration: none;
+        padding: 0.35rem 0;
+        border-bottom: 2px solid transparent;
+      }
+
+      .nav a:hover,
+      .nav a:focus-visible {
+        color: var(--green-bright);
+        border-bottom-color: var(--green);
+      }
+
+      .nav a[aria-current='page'] {
+        color: var(--green-bright);
+        border-bottom-color: var(--green);
+      }
+
+      .burger {
+        display: none;
+        flex-direction: column;
+        gap: 4px;
+        place-items: center;
+        width: 2.5rem;
+        height: 2.5rem;
+        background: transparent;
+        border: 1px solid var(--header-control);
+        border-radius: 6px;
+        color: var(--header-text);
+        cursor: pointer;
+        padding: 0;
+      }
+
+      .burger:hover {
+        border-color: var(--green);
+        color: var(--green-bright);
+      }
+
+      .burger span {
+        display: block;
+        width: 18px;
+        height: 2px;
+        background: currentColor;
+        border-radius: 2px;
+      }
+
+      @media (max-width: 48rem) {
+        .burger {
+          display: inline-flex;
+          justify-content: center;
+        }
+
+        .nav {
+          position: absolute;
+          left: 0;
+          right: 0;
+          top: 100%;
+          flex-direction: column;
+          align-items: stretch;
+          gap: 0;
+          background: var(--header-bg);
+          backdrop-filter: blur(8px);
+          border-bottom: 1px solid var(--header-hairline);
+          padding: 0.5rem 1.25rem 1rem;
+          display: none;
+        }
+
+        .nav.is-open {
+          display: flex;
+        }
+
+        .nav a {
+          padding: 0.85rem 0;
+          border-bottom: 1px solid var(--header-hairline);
+          font-size: 1rem;
+        }
+
+        .nav a:last-child {
+          border-bottom: 0;
+        }
+
+        .nav a[aria-current='page'] {
+          border-bottom-color: var(--header-hairline);
+        }
+      }
+
+      :global(body.nav-open) {
+        overflow: hidden;
+      }
+
+      @media (min-width: 48.01rem) {
+        :global(body.nav-open) {
+          overflow: auto;
+        }
+      }
+    </style>
+  </body>
+</html>

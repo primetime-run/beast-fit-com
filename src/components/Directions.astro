@@ -1,0 +1,171 @@
+---
+import { location, addressLine, directions } from '../lib/data'
+
+/*
+  Address, directions and a map.
+
+  The directions buttons are plain deep links that hand off to whatever maps
+  app the visitor already uses — no script, no key, no cookies, and on a phone
+  they open the native app rather than a web page.
+
+  The map is a static image generated once from OpenStreetMap tiles by
+  scripts/generate-map.mjs and committed. That means it is self-hosted: it can
+  be cached with a content-hashed filename, fetched at high priority with the
+  rest of the page, and served from our own domain — and no visitor makes a
+  request to a third party just to see where the gym is. An embedded iframe
+  could do none of those things.
+
+  ODbL requires attribution wherever the tiles are shown. It is baked into the
+  image AND printed below it; keep both.
+*/
+
+const d = directions()
+const full = addressLine()
+---
+
+<section class="directions">
+  <h2 class="brand-title sub">Where we train</h2>
+
+  <p class="venue">{location.name}</p>
+  <address>
+    {location.street}<br />
+    {location.city}, {location.state} {location.zip}
+  </address>
+
+  {location.landmark && <p class="landmark">{location.landmark}</p>}
+
+  {location.notes?.length && (
+    <ul class="notes">{location.notes.map((n) => <li>{n}</li>)}</ul>
+  )}
+
+  {/* Every link says where it goes, so "Google Maps" repeated across the page
+      is never the whole accessible name. */}
+  <div class="buttons">
+    <a
+      class="btn"
+      href={d.google}
+      rel="noopener"
+      title={`Driving directions to ${location.name}, ${full}, in Google Maps`}
+      aria-label={`Directions to ${location.name} in Google Maps`}
+    >Google Maps</a>
+    {/* Hidden on non-Apple devices by the script below. Rendered by default
+        so it is still there without JavaScript — a wasted button is better
+        than a missing one for anyone who is on an iPhone. */}
+    <a
+      class="btn ghost"
+      href={d.apple}
+      rel="noopener"
+      data-apple-only
+      title={`Driving directions to ${location.name}, ${full}, in Apple Maps`}
+      aria-label={`Directions to ${location.name} in Apple Maps`}
+    >Apple Maps</a>
+    <a
+      class="btn ghost"
+      href={d.waze}
+      rel="noopener"
+      title={`Navigate to ${location.name}, ${full}, in Waze`}
+      aria-label={`Directions to ${location.name} in Waze`}
+    >Waze</a>
+  </div>
+
+  {/* eager + high priority rather than a <link rel="preload">: the effect is
+      the same and it cannot fall out of step with the srcset Astro builds. */}
+  <a
+    class="map"
+    href={d.osm}
+    rel="noopener"
+    title={`Open ${location.name}, ${full}, on OpenStreetMap`}
+  >
+    {/* Served straight from public/ rather than through astro:assets.
+
+        The generator already writes an optimised 128-colour palette PNG, and
+        the asset pipeline made it worse both ways: WebP came out at 89 kB and
+        a PNG re-encode at 186 kB, against a 76 kB source — it strips the
+        palette and emits truecolour. Map tiles are flat colour with hard
+        edges, which palette PNG encodes better than anything else here. Same
+        result the grass tile and the logo gave. */}
+    <img
+      src="/map/location.png"
+      srcset="/map/location-450.png 450w, /map/location.png 900w"
+      sizes="(min-width: 52rem) 22rem, 92vw"
+      width="900"
+      height="600"
+      alt={`Map showing ${location.name} at ${full}`}
+      loading="eager"
+      fetchpriority="high"
+      decoding="async"
+    />
+    <span class="map-open">Open map</span>
+  </a>
+
+  <p class="fallback">
+    Map data &copy; <a href="https://www.openstreetmap.org/copyright" rel="noopener">OpenStreetMap</a>
+    contributors.
+  </p>
+</section>
+
+<script>
+  /* Apple Maps on an Android phone opens a web page that cannot actually
+     navigate, so the button is only worth showing on Apple hardware.
+
+     iPadOS 13+ reports itself as "Macintosh", which is why Macintosh counts —
+     and Android is excluded explicitly because some Android browsers put
+     "Mac OS X" in their user agent string. */
+  const ua = navigator.userAgent
+  const isApple = /iPhone|iPad|iPod|Macintosh/.test(ua) && !/Android/.test(ua)
+
+  if (!isApple) {
+    for (const el of document.querySelectorAll('[data-apple-only]')) {
+      el.remove()
+    }
+  }
+</script>
+
+<style>
+  .directions { margin: 0; }
+  .sub { font-size: .9rem; text-transform: uppercase; margin: 0 0 .5rem; }
+
+  .venue { margin: 0; font-weight: 700; }
+  address { font-style: normal; color: var(--text-muted); line-height: 1.6; margin: .15rem 0 .75rem; }
+
+  /* Given more weight than the practical notes below it — the field is set
+     back from the road, so this is the line that actually gets people there. */
+  .landmark {
+    margin: 0 0 .75rem;
+    padding-left: .7rem;
+    border-left: 3px solid var(--green);
+    font-size: .9rem;
+    font-weight: 700;
+  }
+
+  .notes {
+    list-style: none; margin: 0 0 1rem; padding: 0;
+    display: grid; gap: .2rem;
+    font-size: .85rem; color: var(--text-muted);
+  }
+  .notes li::before { content: '— '; }
+
+  .buttons { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
+  .buttons .btn { font-size: .85rem; padding: .5rem 1rem; }
+
+  .map {
+    position: relative;
+    display: block;
+    border: 1px solid var(--edge);
+    line-height: 0;
+  }
+  .map img { display: block; width: 100%; height: auto; }
+
+  .map-open {
+    position: absolute; left: 0; bottom: 0;
+    font-family: var(--body); font-size: .68rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .06em;
+    background: var(--green); color: #0a0a0a;
+    padding: .25rem .55rem;
+    line-height: 1.4;
+  }
+  .map:hover .map-open,
+  .map:focus-visible .map-open { background: var(--green-bright); }
+
+  .fallback { margin: .6rem 0 0; font-size: .8rem; color: var(--text-muted); }
+</style>
