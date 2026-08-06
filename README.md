@@ -158,8 +158,7 @@ The enquiry goes to one fixed verified address and must succeed; a failure
 returns 502 so the sender knows to retry.
 
 The handler can also acknowledge the enquirer, but **that is off** — the gym
-does not want it, and it is the only thing here that would need SES production
-access, since it goes to an address nobody verified. If it is ever turned on,
+does not want one. If it is ever turned on it needs SES production access, and
 note it is deliberately best-effort: telling someone their message failed when
 the gym already has it is the worst available outcome.
 
@@ -258,19 +257,39 @@ Otherwise, by hand: apex `A` to the four `185.199.108–111.153` addresses, and
 `www` `CNAME` to `primetime-run.github.io`. TTL 300 while cutting over, so a
 rollback propagates in minutes rather than hours.
 
-## SES sandbox
+## Email
 
-The account sends 200 emails a day, **only to verified addresses**. That is
-fine for everything going to the gym's own inbox — contact enquiries and
-payment alerts — and it is a useful safety ceiling: even if every other
-control failed, nothing could reach a stranger.
+Three emails exist, and only two of them come from here.
 
-Production access is needed only for mail to customers: the contact form
-acknowledgement, and any receipt. Request it from the SES console; approval
-usually takes under a day, and it is granted **per region** (`us-east-1` here).
+| Email | To | Sent by |
+|---|---|---|
+| Contact enquiry | the gym | this stack, from `no-reply@beast-fit.com` |
+| New order alert | the gym | this stack, from `no-reply@beast-fit.com` |
+| Order receipt | the customer | **Authorize.Net**, not us |
 
-Authorize.Net can also email customers a receipt directly, configured in the
-Merchant Interface — free, and no production access required.
+### SES production access is not needed
+
+The account is in the SES sandbox: 200 emails a day, **only to verified
+addresses**. Both emails this stack sends go to the gym's own verified inbox,
+so the sandbox is sufficient — and it is a useful safety ceiling, since even
+if every other control failed nothing could reach a stranger.
+
+Customer receipts are handled by Authorize.Net's own email, enabled in the
+Merchant Interface under Settings → Email Receipt. The hosted payment form
+already collects the customer's email (`requiredEmail: true`), so Authorize.Net
+has it and we do not need to.
+
+That last point is not just convenience. **The webhook notification does not
+include the customer's email address** — it carries only the transaction id,
+amount, response code and AVS result. Sending a receipt ourselves would mean
+calling `getTransactionDetails` to fetch the address back, which means giving
+the webhook the Transaction Key on top of the Signature Key it needs for
+verification. Letting Authorize.Net send the receipt avoids widening that
+function's access to a credential it has no other reason to hold.
+
+The contact handler can also acknowledge the enquirer. It is off, the gym does
+not want one, and it is the only remaining thing that would require production
+access.
 
 ## Cost
 
