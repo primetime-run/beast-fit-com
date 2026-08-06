@@ -175,8 +175,19 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
   iframe {
     display: block;
     width: 100%;
-    /* Grows to whatever the hosted form reports via resizeWindow. */
-    height: 0;
     border: 0;
+
+    /* Grows to whatever the hosted form reports via resizeWindow — but starts
+       tall enough to be usable if that message never arrives.
+
+       It previously started at 0, which made the whole lightbox depend on a
+       single postMessage: if the communicator page is unreachable, or the
+       message is late, or the origin does not match, the customer sees a blank
+       box and no error. The form is loading fine behind it, at zero height.
+
+       min-height rather than height so a real resizeWindow can still shrink it
+       below this once the true size is known. */
+    height: 0;
+    min-height: 34rem;
   }
 </style>
