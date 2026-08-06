@@ -48,22 +48,17 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
     </div>
   </header>
 
-  {/* Shown until the hosted form is in the frame. The frame itself stays
-      hidden until then: an empty bordered panel with a green edge reads as a
-      form that failed to load, which is worse than showing nothing. */}
-  <div class="loading" data-checkout-loading>
-    <span class="spinner" aria-hidden="true"></span>
-    <p>Opening secure payment…</p>
-    <p class="loading-sub">You are being connected to our payment provider.</p>
-  </div>
-
   {/* What is being bought, above the form.
 
       Filled from the Lambda's response, not from the button that opened this.
       The server resolves the price from the catalog, so the figure shown here
       is the figure being charged — a summary built from the page's own idea of
       the price could disagree with the transaction and nobody would know until
-      a customer complained. */}
+      a customer complained.
+
+      Above the loader in the markup, deliberately. The loader is flex:1, so a
+      summary declared after it gets pushed to the bottom of the screen while
+      both are visible — then jumps to the top when the loader hides. */}
   <div class="summary" data-checkout-summary hidden>
     <div class="wrap summary-inner">
       <span class="summary-what">
@@ -72,6 +67,15 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
       </span>
       <span class="summary-amount" data-summary-amount></span>
     </div>
+  </div>
+
+  {/* Shown until the hosted form is in the frame. The frame itself stays
+      hidden until then: an empty bordered panel with a green edge reads as a
+      form that failed to load, which is worse than showing nothing. */}
+  <div class="loading" data-checkout-loading>
+    <span class="spinner" aria-hidden="true"></span>
+    <p>Opening secure payment…</p>
+    <p class="loading-sub">You are being connected to our payment provider.</p>
   </div>
 
   <p class="status" data-checkout-status hidden></p>
