@@ -154,14 +154,14 @@ injection, optional Turnstile, per-IP rate limit. The honeypot and timing
 checks answer `200` on failure — telling a bot which check caught it teaches it
 to pass.
 
-Two emails may leave, and they are not equally safe. The **enquiry** goes to
-one fixed verified address and must succeed; a failure returns 502 so the
-sender knows to retry. The **acknowledgement** goes to whatever address the
-visitor typed, so it is best-effort and its failure is swallowed — telling
-someone their message failed when the gym already has it is the worst
-available outcome.
+The enquiry goes to one fixed verified address and must succeed; a failure
+returns 502 so the sender knows to retry.
 
-That acknowledgement is off until SES production access is granted; see below.
+The handler can also acknowledge the enquirer, but **that is off** — the gym
+does not want it, and it is the only thing here that would need SES production
+access, since it goes to an address nobody verified. If it is ever turned on,
+note it is deliberately best-effort: telling someone their message failed when
+the gym already has it is the worst available outcome.
 
 ## Deploy
 
@@ -224,17 +224,23 @@ resolving.
 
 ### 5. Email DNS
 
-`terraform output dns_status` prints what is needed. Five records, all on
-`mail.beast-fit.com`: three DKIM CNAMEs, SPF, and DMARC at `p=none`.
+`terraform output dns_status` prints what is needed. Five records on
+`beast-fit.com`: three DKIM CNAMEs, SPF, and DMARC at `p=none`.
+
+Mail is sent from the **root domain** as `no-reply@beast-fit.com`. The usual
+reason to send from a `mail.` subdomain is to keep SES's records clear of
+whatever already handles the domain's mailbox — but beast-fit.com publishes no
+MX and no TXT records at all, so there is nothing to collide with.
 
 They are printed rather than created because **the Route 53 zone is in a
 different AWS account** — beast-fit.com resolves through `awsdns-*`
 nameservers, but account 588307916645 has no hosted zones. Move the zone here
 and set `manage_dns = true`, and Terraform owns them instead.
 
-**Do not add SPF to the root domain.** A domain may publish only one SPF
-record; a second makes receivers treat the whole domain as `permerror` and
-breaks mail that currently works.
+If the gym ever starts receiving mail at this domain, whoever sets that up
+must **merge** `amazonses` into the SPF record rather than adding a second
+one. A domain may publish only one SPF record; two makes receivers treat the
+whole domain as `permerror` and fail the lot.
 
 ### 6. Cutover
 

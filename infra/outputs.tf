@@ -21,7 +21,7 @@ output "dkim_tokens" {
 locals {
   dns_managed = <<-EOT
 
-    Managed here. Terraform owns these, on ${var.mail_subdomain}:
+    Managed here. Terraform owns these, on ${var.mail_domain}:
 
       3 x CNAME  DKIM
       1 x TXT    SPF
@@ -43,13 +43,13 @@ locals {
     Create these by hand in the account that holds the zone. Nothing sends
     until the DKIM records exist and SES has seen them:
 
-      CNAME  <token>._domainkey.${var.mail_subdomain}  ->  <token>.dkim.amazonses.com
+      CNAME  <token>._domainkey.${var.mail_domain}  ->  <token>.dkim.amazonses.com
              one per token, from `terraform output dkim_tokens`
 
-      TXT    ${var.mail_subdomain}
+      TXT    ${var.mail_domain}
              "v=spf1 include:amazonses.com -all"
 
-      TXT    _dmarc.${var.mail_subdomain}
+      TXT    _dmarc.${var.mail_domain}
              "v=DMARC1; p=none; rua=mailto:${var.notify_to}"
 
     Every one is on the mail. subdomain. Do NOT add SPF to the root domain: a

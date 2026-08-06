@@ -39,17 +39,23 @@ locals {
 # ---------------------------------------------------------------------------
 
 resource "aws_sesv2_email_identity" "domain" {
-  email_identity = var.mail_subdomain
+  email_identity = var.mail_domain
 
   dkim_signing_attributes {
     next_signing_key_length = "RSA_2048_BIT"
   }
 }
 
-# Required while the SES account is in the sandbox, where mail may only go to
-# verified addresses. Harmless to keep once production access is granted.
-resource "aws_sesv2_email_identity" "recipient" {
-  email_identity = var.notify_to
+# Recipients, verified because the SES sandbox only delivers to verified
+# addresses. Harmless to keep once production access is granted.
+#
+# for_each over a set, not one resource per variable: notify_to and contact_to
+# are usually the same inbox, and declaring that address twice makes the apply
+# fail with "already exists" — which reads as drift rather than as two
+# resources fighting over one identity.
+resource "aws_sesv2_email_identity" "recipients" {
+  for_each       = toset([var.notify_to, var.contact_to])
+  email_identity = each.value
 }
 
 # ---------------------------------------------------------------------------
@@ -204,7 +210,7 @@ data "aws_iam_policy_document" "webhook" {
     actions = ["ses:SendEmail"]
     resources = [
       aws_sesv2_email_identity.domain.arn,
-      aws_sesv2_email_identity.recipient.arn,
+      aws_sesv2_email_identity.recipients[var.notify_to].arn,
     ]
   }
 }
@@ -230,7 +236,7 @@ resource "aws_lambda_function" "webhook" {
       AUTHNET_SIGNATURE_KEY = var.authnet_signature_key
       DEDUPE_TABLE          = aws_dynamodb_table.dedupe.name
       NOTIFY_TO             = var.notify_to
-      NOTIFY_FROM           = "BEAST Fitness <payments@${var.mail_subdomain}>"
+      NOTIFY_FROM           = "BEAST Fitness <no-reply@${var.mail_domain}>"
       NODE_OPTIONS          = "--enable-source-maps"
       # AWS_REGION is set by the Lambda runtime and is reserved — setting it
       # here fails the deploy.
@@ -282,7 +288,7 @@ data "aws_iam_policy_document" "contact" {
     actions = ["ses:SendEmail"]
     resources = [
       aws_sesv2_email_identity.domain.arn,
-      aws_sesv2_email_identity.contact_recipient.arn,
+      aws_sesv2_email_identity.recipients[var.contact_to].arn,
     ]
   }
 }
@@ -291,12 +297,6 @@ resource "aws_iam_role_policy" "contact" {
   name   = "ses-send"
   role   = aws_iam_role.contact.id
   policy = data.aws_iam_policy_document.contact.json
-}
-
-# The inbox enquiries land in. Verified so it works while SES is in the
-# sandbox; harmless once production access is granted.
-resource "aws_sesv2_email_identity" "contact_recipient" {
-  email_identity = var.contact_to
 }
 
 resource "aws_lambda_function" "contact" {
@@ -312,8 +312,8 @@ resource "aws_lambda_function" "contact" {
   environment {
     variables = {
       CONTACT_TO      = var.contact_to
-      CONTACT_FROM    = "BEAST Fitness <enquiries@${var.mail_subdomain}>"
-      AUTOREPLY_FROM  = "BEAST Fitness <noreply@${var.mail_subdomain}>"
+      CONTACT_FROM    = "BEAST Fitness <no-reply@${var.mail_domain}>"
+      AUTOREPLY_FROM  = "BEAST Fitness <no-reply@${var.mail_domain}>"
       ALLOWED_ORIGINS = join(",", var.allowed_origins)
       # "on" only once SES production access is granted. The acknowledgement
       # goes to whatever address the visitor typed, and the sandbox refuses

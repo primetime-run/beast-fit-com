@@ -149,15 +149,22 @@ variable "point_dns_at_pages" {
   default     = false
 }
 
-variable "mail_subdomain" {
+variable "mail_domain" {
   description = <<-EOT
-    Subdomain SES sends from, e.g. mail.beast-fit.com.
+    Domain SES sends from.
 
-    A subdomain rather than the root domain so the DKIM, SPF and DMARC records
-    this needs cannot collide with whatever handles the gym's actual mailbox.
+    The root domain, not a subdomain. The usual reason to send from mail.* is
+    to keep SES's SPF and DKIM clear of whatever already handles the domain's
+    mailbox — but beast-fit.com publishes no MX and no TXT records at all, so
+    there is nothing to collide with. A plain no-reply@beast-fit.com is what
+    recipients expect to see, and it is one fewer name to explain.
+
+    If the gym ever starts receiving mail at this domain, whoever sets that up
+    must MERGE amazonses into the SPF record rather than adding a second one —
+    a domain may publish only one, and two makes receivers fail the lot.
   EOT
   type        = string
-  default     = "mail.beast-fit.com"
+  default     = "beast-fit.com"
 }
 
 variable "contact_to" {

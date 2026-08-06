@@ -38,7 +38,7 @@ resource "aws_route53_record" "dkim" {
   for_each = var.manage_dns ? toset(aws_sesv2_email_identity.domain.dkim_signing_attributes[0].tokens) : toset([])
 
   zone_id = local.zone_id
-  name    = "${each.value}._domainkey.${var.mail_subdomain}"
+  name    = "${each.value}._domainkey.${var.mail_domain}"
   type    = "CNAME"
   ttl     = 1800
   records = ["${each.value}.dkim.amazonses.com"]
@@ -51,7 +51,7 @@ resource "aws_route53_record" "dkim" {
 resource "aws_route53_record" "spf" {
   count   = var.manage_dns ? 1 : 0
   zone_id = local.zone_id
-  name    = var.mail_subdomain
+  name    = var.mail_domain
   type    = "TXT"
   ttl     = 1800
   records = ["v=spf1 include:amazonses.com -all"]
@@ -63,7 +63,7 @@ resource "aws_route53_record" "spf" {
 resource "aws_route53_record" "dmarc" {
   count   = var.manage_dns ? 1 : 0
   zone_id = local.zone_id
-  name    = "_dmarc.${var.mail_subdomain}"
+  name    = "_dmarc.${var.mail_domain}"
   type    = "TXT"
   ttl     = 1800
   records = ["v=DMARC1; p=none; rua=mailto:${var.notify_to}"]

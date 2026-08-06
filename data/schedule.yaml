@@ -39,7 +39,7 @@ classes:
     name: "BEAST BEATDOWN: Full Body"
     duration: 90
     slots:
-      - { day: Sat, times: ["06:00"] }
+      - { day: Sat, times: ["06:30"] }
 
 # ---------------------------------------------------------------------------
 # Holiday handling. Three behaviours, all observed in your existing calendar:
