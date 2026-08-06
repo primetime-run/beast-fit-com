@@ -135,12 +135,36 @@ export async function handler(event) {
     },
     hostedPaymentButtonOptions: { text: 'Pay' },
     hostedPaymentPaymentOptions: { cardCodeRequired: true },
-    // Billing address is collected because AVS and CVV together are what make
-    // the fraud filters worth anything on a card-not-present charge.
+
+    // Billing address stays. It is the one setting here that is not cosmetic:
+    // AVS and CVV together are what make the fraud filters worth anything on a
+    // card-not-present charge, and turning it off to shorten the form trades a
+    // real control for a shorter scroll.
     hostedPaymentBillingAddressOptions: { show: true, required: true },
+
+    // Email is required so Authorize.Net can send the customer their receipt —
+    // that receipt is our order confirmation, so this field is load-bearing.
     hostedPaymentCustomerOptions: { showEmail: true, requiredEmail: true },
-    hostedPaymentOrderOptions: { show: true, merchantName: 'BEAST Fitness' },
-    hostedPaymentSecurityOptions: { captcha: true },
+
+    // The order summary is hidden: the page already says what is being bought,
+    // and repeating it inside the iframe only makes the form taller. The
+    // merchant name still appears on the card statement.
+    hostedPaymentOrderOptions: { show: false, merchantName: 'BEAST Fitness' },
+
+    // No CAPTCHA inside the payment form. It is a second challenge in front of
+    // someone who has already decided to pay, and the checkout endpoint is
+    // already behind an origin allow-list and a rate limit, with Authorize.Net's
+    // own fraud filters behind that.
+    hostedPaymentSecurityOptions: { captcha: false },
+
+    /* Styles the Pay button, not the form background — Accept Hosted exposes
+       no control over the form's own surface. This is the brand green, the
+       same --green the site's own buttons use, so the button inside the iframe
+       matches the one the customer clicked to open it.
+
+       That is the ceiling: a button colour. No layout control, no fonts, no
+       field arrangement. It is the trade for card fields never touching this
+       site, and it is what keeps the merchant in PCI SAQ A. */
     hostedPaymentStyleOptions: { bgColor: '#8bc34a' },
   }
 
