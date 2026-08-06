@@ -309,14 +309,15 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
     min-height: 0;
     border: 0;
 
-    /* Centred column rather than full-bleed. The hosted form is responsive, so
-       it fills whatever width it is given — across a 1280px desktop that left
-       a short form stranded in a white expanse. A reading-width column looks
-       deliberate and matches the rest of the site.
+    /* Same box as the panels on contact, training and the product pages.
+       --page-max and the 1.25rem inline padding are .wrap's own values, so the
+       form sits on exactly the column everything else does rather than a width
+       picked for this one screen.
 
-       Still 100% on a phone, where the viewport is already narrower than the
-       cap. */
-    width: min(100%, 44rem);
+       No padding subtracted: .wrap's 1.25rem is inside its box, insetting its
+       contents rather than narrowing the box itself. Taking it off here made
+       the frame 40px narrower than the panel at every width below the cap. */
+    width: min(100%, var(--page-max));
     margin-inline: auto;
   }
 
@@ -326,14 +327,18 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
 
      Not on a phone: there the form needs every pixel of width more than it
      needs framing. */
+  /* Panel treatment, same tokens as main.panel. No bottom margin: the form
+     runs from under the header to the bottom of the screen, so there is no
+     strip of grass beneath it to suggest the page continues when it does not.
+
+     Only from 48rem up. On a phone the form needs every pixel of width more
+     than it needs framing. */
   @media (min-width: 48rem) {
     .checkout iframe {
-      /* Flush to the header, grass below. A gap above put a strip of
-         background between the bar and the form, which read as the panel
-         having come loose rather than hanging off the header. */
-      margin-block: 0 2rem;
-      box-shadow: var(--shadow);
+      margin-block: 0;
+      border: 1px solid var(--hairline);
       border-top: 3px solid var(--green);
+      box-shadow: var(--shadow);
     }
   }
 </style>
