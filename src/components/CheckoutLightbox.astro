@@ -28,16 +28,24 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
       It matters more here than it looks: this is a full-screen page asking for
       a card number. Someone who cannot see whose site they are on has every
       reason to hesitate, and should. */}
-  <header class="bar">
-    <img
-      class="mark"
-      src={logo.src}
-      alt="Beast Fitness"
-      width={logo.width}
-      height={logo.height}
-    />
-    <span class="secure">Secure payment</span>
-    <button type="button" class="x" data-checkout-close aria-label="Close payment">×</button>
+  <header class="site-header">
+    <div class="wrap bar">
+      {/* Not a link. On the masthead the wordmark goes home; here that would
+          abandon a payment halfway through, which is what the close button is
+          for — and that one at least warns nothing has been charged. */}
+      <span class="site-title">
+        <img src={logo.src} alt="Beast Fitness" width={logo.width} height={logo.height} />
+      </span>
+
+      <span class="secure">Secure payment</span>
+
+      <button type="button" class="x" data-checkout-close aria-label="Close payment">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+          <path d="M5 5 L19 19 M19 5 L5 19" stroke="currentColor" stroke-width="2.5"
+                stroke-linecap="round" fill="none"></path>
+        </svg>
+      </button>
+    </div>
   </header>
 
   <p class="status" data-checkout-status>Loading payment form…</p>
@@ -174,7 +182,20 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
   .checkout {
     border: 0;
     border-radius: 0;
-    background: var(--surface);
+
+    /* The same grass the rest of the site sits on, veil included — the tokens
+       come from global.css, so it follows the theme without a second
+       definition to keep in step.
+
+       Worth it because this is the one screen a customer reaches that renders
+       none of our own markup below the header. Without it, the page they type
+       a card number into looks like a different site to the one they were just
+       browsing. */
+    background-color: var(--bg);
+    background-image: linear-gradient(var(--grass-veil), var(--grass-veil)), url('/grass.webp');
+    background-position: left top;
+    background-size: auto;
+    background-repeat: repeat;
     padding: 0;
     width: 100vw;
     max-width: 100vw;
@@ -201,42 +222,68 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
   }
   .checkout::backdrop { background: rgba(0, 0, 0, 0.85); }
 
-  /* Always black, in both themes — the wordmark is white-on-transparent. */
+  /* Matched to the site masthead, using the same tokens rather than copies of
+     its values — so restyling the header restyles this too instead of leaving
+     the payment page as the one screen that looks slightly off. */
+  .site-header {
+    flex: none;
+    background: var(--header-bg);
+    border-bottom: 1px solid var(--header-hairline);
+    color: var(--header-text);
+  }
+
   .bar {
     display: flex;
     align-items: center;
     gap: 1rem;
-    flex: none;
-    background: #0a0a0a;
-    border-bottom: 3px solid var(--green);
-    padding: 0.75rem 1.25rem;
-  }
-  .bar .mark {
-    height: 1.9rem;
-    width: auto;
-    display: block;
-  }
-  .bar .secure {
-    font-family: var(--brand);
-    font-size: 0.72rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--green-bright);
-    margin-right: auto;
+    min-height: var(--nav-h);
   }
 
-  /* In the bar now, not floating over the form. */
+  .site-title {
+    display: inline-flex;
+    align-items: center;
+    margin-right: auto;
+    line-height: 0;
+  }
+
+  .site-title img {
+    height: 2.2rem;
+    width: auto;
+  }
+
+  .secure {
+    font-family: var(--brand);
+    font-size: 0.8rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--green-bright);
+  }
+
+  /* Same box as the masthead's menu button: the two controls sit in the same
+     place on screen, so they should look like the same kind of thing. */
   .x {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     flex: none;
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0;
     background: transparent;
-    border: 0;
-    color: #fff;
-    font-size: 1.6rem;
-    line-height: 1;
-    padding: 0.2rem 0.5rem;
+    border: 1px solid var(--header-control);
+    border-radius: 6px;
+    color: var(--header-text);
     cursor: pointer;
   }
-  .x:hover, .x:focus-visible { color: var(--green-bright); }
+  .x:hover,
+  .x:focus-visible {
+    border-color: var(--green);
+    color: var(--green-bright);
+  }
+
+  @media (max-width: 30rem) {
+    .secure { display: none; } /* the padlock is the browser's job at this size */
+  }
 
   .status {
     margin: 0;
@@ -271,5 +318,22 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
        cap. */
     width: min(100%, 44rem);
     margin-inline: auto;
+  }
+
+  /* Breathing room so the grass reads as background rather than a stripe down
+     each side, and the form sits on it as a panel — matching how every other
+     page puts its content on a surface above the tile.
+
+     Not on a phone: there the form needs every pixel of width more than it
+     needs framing. */
+  @media (min-width: 48rem) {
+    .checkout iframe {
+      /* Flush to the header, grass below. A gap above put a strip of
+         background between the bar and the form, which read as the panel
+         having come loose rather than hanging off the header. */
+      margin-block: 0 2rem;
+      box-shadow: var(--shadow);
+      border-top: 3px solid var(--green);
+    }
   }
 </style>
