@@ -186,6 +186,16 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
        hiding it means a customer can see a field they cannot get to, with
        nothing to indicate why. */
     overflow: auto;
+  }
+
+  /* Scoped to [open], and it must be.
+   *
+   * The browser hides a closed dialog with `display: none`. Declaring
+   * `display: flex` on the element itself overrides that, so the closed dialog
+   * stays in the layout — an empty full-height block sitting at the bottom of
+   * every page that includes this component. That is the stray whitespace, and
+   * the reason it appeared to render at the bottom. */
+  .checkout[open] {
     display: flex;
     flex-direction: column;
   }
