@@ -48,7 +48,16 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
     </div>
   </header>
 
-  <p class="status" data-checkout-status>Loading payment form…</p>
+  {/* Shown until the hosted form is in the frame. The frame itself stays
+      hidden until then: an empty bordered panel with a green edge reads as a
+      form that failed to load, which is worse than showing nothing. */}
+  <div class="loading" data-checkout-loading>
+    <span class="spinner" aria-hidden="true"></span>
+    <p>Opening secure payment…</p>
+    <p class="loading-sub">You are being connected to our payment provider.</p>
+  </div>
+
+  <p class="status" data-checkout-status hidden></p>
 
   {/* name is what the POST targets; Authorize.Net renders into it. */}
   {/* scrolling is left to the browser. It used to be "no", which only worked
@@ -82,14 +91,90 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
     const form = dlg.querySelector('[data-checkout-form]')
     const tokenField = dlg.querySelector('[data-checkout-token]')
     const status = dlg.querySelector('[data-checkout-status]')
+    const loading = dlg.querySelector('[data-checkout-loading]')
 
-    const setStatus = (msg) => {
-      status.textContent = msg
-      status.hidden = !msg
+    /* The frame is revealed when the hosted form has actually rendered in it,
+       not when the POST is fired. The load event fires for about:blank too, so
+       a flag tracks whether a form was submitted into it — otherwise the
+       loader disappears the instant the dialog opens. */
+    let awaitingForm = false
+    frame.addEventListener('load', () => {
+      if (!awaitingForm) return
+      awaitingForm = false
+      loading.hidden = true
+      frame.hidden = false
+    })
+
+    /* Loader visible, frame and error hidden. The starting state, and the
+       state to return to when reopening — otherwise a second attempt after a
+       failure opens straight onto the previous error. */
+    const showLoading = () => {
+      loading.hidden = false
+      frame.hidden = true
+      status.hidden = true
+      status.textContent = ''
+      status.classList.remove('is-error')
+    }
+
+    /* What a customer sees when it goes wrong.
+     *
+     * "gateway_refused" in a console is fine for us and useless to them. Each
+     * of these says what happened and what to do about it, and every one is
+     * explicit that no money has been taken — that is the question someone
+     * actually has when a payment screen fails, and leaving it unanswered is
+     * how you get a duplicate attempt or an angry phone call.
+     *
+     * The code is shown in small print so a support conversation can start
+     * with a fact rather than "it didn't work". */
+    const MESSAGES = {
+      rate_limited:
+        'Too many attempts in a short time. Please wait a minute and try again — nothing has been charged.',
+      unknown_product:
+        'That item is not available to buy online right now. Please contact us and we will sort it out — nothing has been charged.',
+      unknown_option:
+        'That option is not available to buy online right now. Please contact us — nothing has been charged.',
+      origin_not_allowed:
+        'Payments are not enabled on this address. Please use beast-fit.com — nothing has been charged.',
+      not_configured:
+        'Online payment is not set up yet. Please contact us to pay another way — nothing has been charged.',
+      gateway_refused:
+        'Our payment provider turned the request away. This is our problem, not your card — nothing has been charged. Please contact us.',
+      gateway_unreachable:
+        'We could not reach our payment provider. Please try again in a minute — nothing has been charged.',
+      gateway_bad_response:
+        'Our payment provider sent something we could not read. Please try again, or contact us — nothing has been charged.',
+      unreachable:
+        'Could not reach us — check your connection and try again. Nothing has been charged.',
+    }
+
+    const fail = (code) => {
+      /* The frame is empty here and the loader is lying — neither should stay
+         on screen behind an error. */
+      awaitingForm = false
+      loading.hidden = true
+      frame.hidden = true
+      status.hidden = false
+      status.classList.add('is-error')
+      status.textContent =
+        MESSAGES[code] ??
+        'Something went wrong starting the payment. Please try again, or contact us — nothing has been charged.'
+
+      // A way out, and a way to reach a human, without hunting for the X.
+      const actions = document.createElement('span')
+      actions.className = 'status-actions'
+      const contact = document.createElement('a')
+      contact.href = '/contact/'
+      contact.textContent = 'Contact us'
+      const ref = document.createElement('span')
+      ref.className = 'status-code'
+      ref.textContent = `reference: ${code}`
+      actions.append(contact, ref)
+      status.appendChild(actions)
     }
 
     const close = () => {
       dlg.close()
+      awaitingForm = false
       // Blank the frame so a closed overlay is never holding a live payment
       // session, and so reopening always starts clean.
       frame.src = 'about:blank'
@@ -102,11 +187,11 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
     })
 
     async function open(product, option) {
-      setStatus('Loading payment form…')
+      showLoading()
       dlg.showModal()
 
       if (!endpoint) {
-        setStatus('Checkout is not configured yet. Please call or use the contact form.')
+        fail('not_configured')
         return
       }
 
@@ -117,17 +202,17 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ product, option }),
         })
-        data = await res.json()
-        if (!res.ok) throw new Error(data.error ?? res.status)
+        data = await res.json().catch(() => ({}))
+        if (!res.ok) throw Object.assign(new Error(data.error ?? `http_${res.status}`), { code: data.error })
       } catch (err) {
         console.error('checkout', err)
-        setStatus('Sorry — we could not start the payment. Please try again, or contact us.')
+        fail(err.code ?? (err.name === 'TypeError' ? 'unreachable' : 'unknown'))
         return
       }
 
-      setStatus('')
       form.action = data.action
       tokenField.value = data.token
+      awaitingForm = true
       form.submit()
     }
 
@@ -285,11 +370,107 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
     .secure { display: none; } /* the padlock is the browser's job at this size */
   }
 
+  /* The loader. Occupies the same column the form will, so revealing the form
+     does not shift the page — the loader is not a placeholder that vanishes
+     and lets everything jump. */
+  .loading {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 2rem 1.25rem;
+    text-align: center;
+    color: var(--text);
+  }
+
+  /* On a panel, not on the grass. Body text straight onto the tile is
+     unreadable — the same reason every other page puts its content on a
+     surface. */
+  .loading > * {
+    position: relative;
+    z-index: 1;
+  }
+  .loading::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: min(100% - 2.5rem, 26rem);
+    height: 13rem;
+    background: var(--surface);
+    border: 1px solid var(--edge);
+    border-top: 3px solid var(--green);
+    box-shadow: var(--shadow);
+  }
+  .loading[hidden] { display: none; }
+  .loading p { margin: 0; }
+  .loading-sub { font-size: 0.85rem; color: var(--text-muted); }
+
+  .spinner {
+    width: 2.5rem;
+    height: 2.5rem;
+    margin-bottom: 0.75rem;
+    border: 3px solid var(--hairline);
+    border-top-color: var(--green);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Respect a stated preference for less motion: pulse rather than spin. A
+     payment screen is not the place to ignore that. */
+  @media (prefers-reduced-motion: reduce) {
+    .spinner {
+      animation: pulse 1.4s ease-in-out infinite;
+      border-top-color: var(--green);
+    }
+    @keyframes pulse { 50% { opacity: 0.35; } }
+  }
+
   .status {
     margin: 0;
     padding: 1.5rem;
     text-align: center;
     color: var(--text-muted);
+  }
+  .status[hidden] { display: none; }
+
+  /* An error is not a loading message. It gets the panel treatment so it does
+     not read as "still working" — the state people misread as "wait longer"
+     and then retry into. */
+  .status.is-error {
+    max-width: 34rem;
+    margin: 2rem auto;
+    padding: 1.5rem;
+    background: var(--surface);
+    border: 1px solid var(--edge);
+    border-top: 3px solid #d08a1f;
+    color: var(--text);
+    text-align: left;
+    box-shadow: var(--shadow);
+  }
+
+  /* :global because these elements are built by the script. Astro scopes
+     styles with a data attribute stamped onto elements in the template, and
+     anything from document.createElement never receives it — so the scoped
+     rules silently did not apply and the link ran inline with the sentence. */
+  :global(.status-actions) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+  :global(.status-actions a) { font-weight: 700; }
+  :global(.status-code) {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
   }
   .status[hidden] { display: none; }
 
@@ -303,6 +484,15 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
      height. Filling the container removes that dependency — resizeWindow is
      now a refinement rather than the thing standing between a customer and a
      visible payment form. */
+  /* [hidden] must win over display:block.
+   *
+   * The hidden attribute works by way of a UA rule of display:none, and any
+   * display declaration on the element overrides it. Without this the frame
+   * stayed on screen while "hidden" — its green top border showing as a line
+   * across the page behind the error. Same trap as declaring display on the
+   * dialog itself, which kept the closed dialog in the layout. */
+  iframe[hidden] { display: none; }
+
   iframe {
     display: block;
     flex: 1;
