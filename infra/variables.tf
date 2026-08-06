@@ -129,6 +129,43 @@ variable "mail_subdomain" {
   default     = "mail.beast-fit.com"
 }
 
+variable "contact_to" {
+  description = <<-EOT
+    Address that receives contact form enquiries.
+
+    No default: this repository is public. Put it in terraform.tfvars, which
+    is gitignored. Often the same address as notify_to, but kept separate so
+    payment alerts and sales enquiries can be split later without a code
+    change.
+  EOT
+  type        = string
+}
+
+variable "autoreply" {
+  description = <<-EOT
+    Send the enquirer an acknowledgement as well as the gym.
+
+    Leave false until SES production access is granted. The acknowledgement
+    goes to whatever address the visitor typed, and the SES sandbox refuses
+    any unverified recipient — so enabling it early means every submission
+    logs a failure. The enquiry itself still reaches the gym either way; the
+    handler treats the acknowledgement as best-effort on purpose.
+  EOT
+  type        = bool
+  default     = false
+}
+
+variable "turnstile_secret" {
+  description = <<-EOT
+    Cloudflare Turnstile secret key. Pass via TF_VAR_turnstile_secret; never
+    commit it. Empty means the CAPTCHA check is skipped — the honeypot,
+    timing check, origin allow-list and rate limit all still apply.
+  EOT
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 variable "notify_to" {
   description = <<-EOT
     Address that receives payment notifications from the webhook.

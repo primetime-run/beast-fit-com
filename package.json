@@ -21,6 +21,6 @@
   },
   "devDependencies": {
     "@aws-sdk/client-dynamodb": "^3.1101.0",
-    "@aws-sdk/client-sesv2": "^3.1101.0"
+    "@aws-sdk/client-sesv2": "^3.1104.0"
   }
 }

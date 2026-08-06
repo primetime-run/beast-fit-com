@@ -1,8 +1,9 @@
 # Copy to terraform.tfvars and edit. That file is gitignored.
 #
-# Required. Where payment notifications are delivered. Kept out of git because
-# this repository is public.
-notify_to = "someone@example.com"
+# Required. Where payment notifications and enquiries are delivered. Kept out
+# of git because this repository is public.
+notify_to  = "someone@example.com"
+contact_to = "someone@example.com"
 
 # Everything below has a working default — override only if you need to.
 

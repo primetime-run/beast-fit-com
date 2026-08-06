@@ -8,6 +8,11 @@ output "webhook_endpoint" {
   value       = aws_lambda_function_url.webhook.function_url
 }
 
+output "contact_endpoint" {
+  description = "Set as the PUBLIC_CONTACT_ENDPOINT repository variable."
+  value       = aws_lambda_function_url.contact.function_url
+}
+
 output "dkim_tokens" {
   description = "The three DKIM CNAME tokens; see dns_records_to_add."
   value       = aws_sesv2_email_identity.domain.dkim_signing_attributes[0].tokens

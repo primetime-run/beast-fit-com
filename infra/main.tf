@@ -26,6 +26,7 @@ provider "aws" {
 locals {
   checkout_name = "beast-fit-checkout"
   webhook_name  = "beast-fit-webhook"
+  contact_name  = "beast-fit-contact"
 }
 
 # ---------------------------------------------------------------------------
@@ -244,5 +245,93 @@ resource "aws_lambda_function_url" "webhook" {
 
 resource "aws_cloudwatch_log_group" "webhook" {
   name              = "/aws/lambda/${local.webhook_name}"
+  retention_in_days = 14
+}
+
+# ---------------------------------------------------------------------------
+# Contact form
+#
+# Shares the SES identity with the webhook — one verified domain, different
+# From addresses. Verifying a second domain would mean a second set of DKIM
+# records for no benefit.
+# ---------------------------------------------------------------------------
+
+data "archive_file" "contact" {
+  type        = "zip"
+  source_dir  = "${path.module}/lambda-contact"
+  output_path = "${path.module}/.build/contact.zip"
+}
+
+resource "aws_iam_role" "contact" {
+  name               = local.contact_name
+  assume_role_policy = data.aws_iam_policy_document.assume.json
+}
+
+resource "aws_iam_role_policy_attachment" "contact_logs" {
+  role       = aws_iam_role.contact.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+# Sends as this domain only. Note there is no recipient identity in this list:
+# the enquiry goes to var.contact_to, which is verified separately below, and
+# the acknowledgement goes to an address nobody verified — which SES refuses
+# in the sandbox regardless of IAM. Authorisation is not what gates that; see
+# the AUTOREPLY note on the function.
+data "aws_iam_policy_document" "contact" {
+  statement {
+    actions = ["ses:SendEmail"]
+    resources = [
+      aws_sesv2_email_identity.domain.arn,
+      aws_sesv2_email_identity.contact_recipient.arn,
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "contact" {
+  name   = "ses-send"
+  role   = aws_iam_role.contact.id
+  policy = data.aws_iam_policy_document.contact.json
+}
+
+# The inbox enquiries land in. Verified so it works while SES is in the
+# sandbox; harmless once production access is granted.
+resource "aws_sesv2_email_identity" "contact_recipient" {
+  email_identity = var.contact_to
+}
+
+resource "aws_lambda_function" "contact" {
+  function_name    = local.contact_name
+  role             = aws_iam_role.contact.arn
+  handler          = "index.handler"
+  runtime          = "nodejs22.x"
+  filename         = data.archive_file.contact.output_path
+  source_code_hash = data.archive_file.contact.output_base64sha256
+  timeout          = 10
+  memory_size      = 256
+
+  environment {
+    variables = {
+      CONTACT_TO      = var.contact_to
+      CONTACT_FROM    = "BEAST Fitness <enquiries@${var.mail_subdomain}>"
+      AUTOREPLY_FROM  = "BEAST Fitness <noreply@${var.mail_subdomain}>"
+      ALLOWED_ORIGINS = join(",", var.allowed_origins)
+      # "on" only once SES production access is granted. The acknowledgement
+      # goes to whatever address the visitor typed, and the sandbox refuses
+      # any unverified recipient — so switching this on early means every
+      # submission logs a failure while the gym still gets the enquiry.
+      AUTOREPLY        = var.autoreply ? "on" : "off"
+      TURNSTILE_SECRET = var.turnstile_secret
+      NODE_OPTIONS     = "--enable-source-maps"
+    }
+  }
+}
+
+resource "aws_lambda_function_url" "contact" {
+  function_name      = aws_lambda_function.contact.function_name
+  authorization_type = "NONE"
+}
+
+resource "aws_cloudwatch_log_group" "contact" {
+  name              = "/aws/lambda/${local.contact_name}"
   retention_in_days = 14
 }
