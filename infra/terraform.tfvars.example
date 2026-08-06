@@ -1,0 +1,30 @@
+# Copy to terraform.tfvars and edit. That file is gitignored.
+#
+# Required. Where payment notifications are delivered. Kept out of git because
+# this repository is public.
+notify_to = "someone@example.com"
+
+# Everything below has a working default — override only if you need to.
+
+# aws_profile         = "beast-fit"
+# expected_account_id = "588307916645"
+# region              = "us-east-1"
+# site_url            = "https://beast-fit.com"
+# mail_subdomain      = "mail.beast-fit.com"
+
+# Add the GitHub Pages origin here temporarily if you need to test checkout
+# before the DNS cutover, then remove it.
+# allowed_origins = ["https://beast-fit.com", "https://www.beast-fit.com"]
+
+# "sandbox" until a transaction has been seen working end to end.
+# authnet_env = "sandbox"
+
+# The three credentials have NO defaults and belong nowhere on disk — not even
+# here. Pass them by environment instead:
+#
+#   export TF_VAR_authnet_login_id='...'
+#   export TF_VAR_authnet_transaction_key='...'
+#   export TF_VAR_authnet_signature_key='...'
+#
+# The signature key is a different credential from the transaction key. The
+# webhook verifies with the former; the checkout mints tokens with the latter.

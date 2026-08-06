@@ -1,0 +1,74 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+  # The schedule page renders dated views — "this week", the current month,
+  # which sessions have already happened. A static build freezes those at the
+  # moment it ran, so a site that only builds on push quietly starts showing
+  # last week's classes to anyone who visits.
+  #
+  # 07:10 UTC is a little after 03:10 Eastern: past midnight in the gym's own
+  # timezone year round, so the day rolls over before the rebuild rather than
+  # during it. Not on the hour, because that is when everyone else's cron runs
+  # and GitHub queues them.
+  schedule:
+    - cron: '10 7 * * *'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never cancel a running deploy — let it finish rather than leave Pages in a
+# half-published state.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/configure-pages@v6
+
+      - run: npm ci --no-audit --no-fund
+
+      # Regenerates infra/lambda/catalog.json from data/training.yaml, then
+      # builds. The catalog is what the payment Lambda charges from, so this
+      # step failing means a price in the YAML is malformed — better caught
+      # here than by a customer.
+      - run: npm run build
+        env:
+          # Not secret: a Function URL validates everything server-side, and
+          # this value is inlined into the page by design. Set it as a
+          # repository *variable*, not a secret — masking it only makes the
+          # build log useless.
+          PUBLIC_CHECKOUT_ENDPOINT: ${{ vars.PUBLIC_CHECKOUT_ENDPOINT }}
+
+      # Fails the deploy if any URL that was published before stopped
+      # resolving, or if a page lost its title or description.
+      - run: npm run verify-urls
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
