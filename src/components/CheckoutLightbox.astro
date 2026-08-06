@@ -57,6 +57,23 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
     <p class="loading-sub">You are being connected to our payment provider.</p>
   </div>
 
+  {/* What is being bought, above the form.
+
+      Filled from the Lambda's response, not from the button that opened this.
+      The server resolves the price from the catalog, so the figure shown here
+      is the figure being charged — a summary built from the page's own idea of
+      the price could disagree with the transaction and nobody would know until
+      a customer complained. */}
+  <div class="summary" data-checkout-summary hidden>
+    <div class="wrap summary-inner">
+      <span class="summary-what">
+        <strong data-summary-product></strong>
+        <span data-summary-option></span>
+      </span>
+      <span class="summary-amount" data-summary-amount></span>
+    </div>
+  </div>
+
   <p class="status" data-checkout-status hidden></p>
 
   {/* name is what the POST targets; Authorize.Net renders into it. */}
@@ -92,6 +109,7 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
     const tokenField = dlg.querySelector('[data-checkout-token]')
     const status = dlg.querySelector('[data-checkout-status]')
     const loading = dlg.querySelector('[data-checkout-loading]')
+    const summary = dlg.querySelector('[data-checkout-summary]')
 
     /* The frame is revealed when the hosted form has actually rendered in it,
        not when the POST is fired. The load event fires for about:blank too, so
@@ -109,6 +127,7 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
        state to return to when reopening — otherwise a second attempt after a
        failure opens straight onto the previous error. */
     const showLoading = () => {
+      summary.hidden = true
       loading.hidden = false
       frame.hidden = true
       status.hidden = true
@@ -153,6 +172,7 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
       awaitingForm = false
       loading.hidden = true
       frame.hidden = true
+      summary.hidden = true
       status.hidden = false
       status.classList.add('is-error')
       status.textContent =
@@ -208,6 +228,16 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
         console.error('checkout', err)
         fail(err.code ?? (err.name === 'TypeError' ? 'unreachable' : 'unknown'))
         return
+      }
+
+      /* textContent, not innerHTML — these strings come back over the wire and
+         land next to a card form. */
+      if (data.summary) {
+        summary.querySelector('[data-summary-product]').textContent = data.summary.product ?? ''
+        summary.querySelector('[data-summary-option]').textContent = data.summary.option ?? ''
+        summary.querySelector('[data-summary-amount]').textContent =
+          data.summary.amount ? `$${data.summary.amount}` : ''
+        summary.hidden = false
       }
 
       form.action = data.action
@@ -430,6 +460,41 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
       border-top-color: var(--green);
     }
     @keyframes pulse { 50% { opacity: 0.35; } }
+  }
+
+  /* Sits between the header and the form, on the same column, so it reads as
+     part of the page rather than something floating over it. */
+  .summary {
+    flex: none;
+    background: var(--panel);
+    border-bottom: 1px solid var(--hairline);
+  }
+  .summary[hidden] { display: none; }
+
+  .summary-inner {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding-block: 0.85rem;
+    max-width: var(--page-max);
+  }
+
+  .summary-what {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    font-size: 0.9rem;
+  }
+  .summary-what span { color: var(--text-muted); font-size: 0.85rem; }
+
+  .summary-amount {
+    font-family: var(--brand);
+    font-size: 1.35rem;
+    line-height: 1;
+    color: var(--link);
+    font-variant-numeric: tabular-nums;
   }
 
   .status {

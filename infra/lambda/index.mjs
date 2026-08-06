@@ -146,16 +146,19 @@ export async function handler(event) {
     // that receipt is our order confirmation, so this field is load-bearing.
     hostedPaymentCustomerOptions: { showEmail: true, requiredEmail: true },
 
-    // The order summary is hidden: the page already says what is being bought,
-    // and repeating it inside the iframe only makes the form taller. The
-    // merchant name still appears on the card statement.
+    // Kept hidden, but the summary is not gone — the page renders its own
+    // above the frame, from the `summary` this function returns. That figure
+    // is resolved from the catalog server-side, so what the customer reads is
+    // what is being charged, and it can be styled to match the site rather
+    // than sitting inside an iframe we cannot touch.
     hostedPaymentOrderOptions: { show: false, merchantName: 'BEAST Fitness' },
 
-    // No CAPTCHA inside the payment form. It is a second challenge in front of
-    // someone who has already decided to pay, and the checkout endpoint is
-    // already behind an origin allow-list and a rate limit, with Authorize.Net's
-    // own fraud filters behind that.
-    hostedPaymentSecurityOptions: { captcha: false },
+    // CAPTCHA back on. It was turned off as clutter, on the reasoning that the
+    // endpoint is already behind an origin allow-list and a rate limit — but
+    // those protect the token endpoint, not the card form. Card testing is
+    // carried out against the hosted form itself, and the merchant wears the
+    // per-attempt fees for every declined probe.
+    hostedPaymentSecurityOptions: { captcha: true },
 
     /* Styles the Pay button, not the form background — Accept Hosted exposes
        no control over the form's own surface. This is the brand green, the
