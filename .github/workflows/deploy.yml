@@ -24,8 +24,18 @@ permissions:
 
 # Never cancel a running deploy — let it finish rather than leave Pages in a
 # half-published state.
+#
+# The group is "pages-v2" rather than "pages" because a run stuck in `queued`
+# holds its group indefinitely, and with cancel-in-progress false everything
+# behind it waits rather than displacing it. One such run wedged the queue and
+# the GitHub UI would not cancel it, so subsequent pushes produced no runs at
+# all. Renaming the group routes new runs around the stuck one.
+#
+# Renaming is the escape hatch, not the fix — if this happens again, cancel the
+# stuck run rather than bumping to v3. The serialisation this provides is worth
+# keeping.
 concurrency:
-  group: pages
+  group: pages-v2
   cancel-in-progress: false
 
 jobs:
