@@ -19,6 +19,27 @@ output "dkim_tokens" {
 }
 
 locals {
+  gateway_production = <<-EOT
+       PRODUCTION - real cards, real money.
+
+       There are no test card numbers: the ones in the documentation are
+       declined by the live gateway. Anything put through /checkout/test/
+       bills an actual card, refundable minus the processing fee.
+
+       It is only reachable once PUBLIC_CHECKOUT_ENDPOINT is set as a
+       repository variable AND the calling origin is in allowed_origins.
+       Until both are true this is deployed but unreachable.
+  EOT
+
+  gateway_sandbox = <<-EOT
+       sandbox - nothing here can take real money, whatever card is typed.
+
+       Move to production only once a transaction has worked end to end, and
+       swap the credentials at the same time: they differ between the two.
+  EOT
+
+  gateway_note = var.authnet_env == "production" ? local.gateway_production : local.gateway_sandbox
+
   dns_managed = <<-EOT
 
     Managed here. Terraform owns these, on ${var.mail_domain}:
@@ -93,12 +114,8 @@ output "next_steps" {
     3. Set the repository variable, then re-run the deploy workflow:
          PUBLIC_CHECKOUT_ENDPOINT = ${aws_lambda_function_url.checkout.function_url}
 
-    4. This stack is currently pointed at: ${var.authnet_env}
-
-       While that says "sandbox" no real money can move, whatever card is
-       typed. Flip authnet_env to "production" only after a sandbox
-       transaction has been seen working end to end — and swap the
-       credentials at the same time, since they differ between environments.
+    4. Gateway:
+${local.gateway_note}
 
     5. Prove the live path with /checkout/test/ — one real $1.00 charge.
        Sandbox proves the code; only a live charge proves the account, the
