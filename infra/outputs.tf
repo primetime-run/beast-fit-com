@@ -18,21 +18,21 @@ output "dkim_tokens" {
   value       = aws_sesv2_email_identity.domain.dkim_signing_attributes[0].tokens
 }
 
-output "dns_records_to_add" {
-  description = "DNS for SES. All on the mail. subdomain — nothing here touches the gym's own mailbox."
+output "dns_status" {
+  description = "What this stack has done to DNS."
   value       = <<-EOT
 
-    Every record below is on ${var.mail_subdomain}. The root domain is left
-    alone, so whatever handles the gym's actual email is unaffected.
+    The Route 53 zone for ${var.domain} is in this account, so the SES records
+    are managed by Terraform — nothing to type by hand:
 
-    DKIM (3 records, tokens from `terraform output dkim_tokens`):
-      CNAME  <token>._domainkey.${var.mail_subdomain}  ->  <token>.dkim.amazonses.com
+      3 x CNAME  DKIM, on ${var.mail_subdomain}
+      1 x TXT    SPF,  on ${var.mail_subdomain}
+      1 x TXT    DMARC, p=none (report only)
 
-    SPF, for the subdomain only:
-      TXT    ${var.mail_subdomain}  ->  "v=spf1 include:amazonses.com -all"
+    All on the mail. subdomain. The root domain's own mail records are
+    untouched, so whatever handles the gym's mailbox is unaffected.
 
-    DMARC, for the subdomain only:
-      TXT    _dmarc.${var.mail_subdomain}  ->  "v=DMARC1; p=none; rua=mailto:${var.notify_to}"
+    Pointing at GitHub Pages: ${var.point_dns_at_pages ? "YES — the apex and www now serve Pages" : "not yet (point_dns_at_pages = false)"}
   EOT
 }
 

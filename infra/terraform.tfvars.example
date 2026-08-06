@@ -29,3 +29,13 @@ contact_to = "someone@example.com"
 #
 # The signature key is a different credential from the transaction key. The
 # webhook verifies with the former; the checkout mints tokens with the latter.
+
+# The cutover. FALSE until you are ready to take the live WordPress site
+# offline — this points the domain at GitHub Pages.
+#
+#   terraform apply -var 'point_dns_at_pages=true'
+#
+# Set the custom domain in the repo's Pages settings BEFORE flipping this.
+# DNS alone is not enough, and the failure mode when Pages does not know the
+# hostname is a "Site not found" page that looks exactly like a DNS fault.
+# point_dns_at_pages = false

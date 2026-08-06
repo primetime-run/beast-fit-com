@@ -118,6 +118,37 @@ variable "authnet_signature_key" {
 # Notifications
 # ---------------------------------------------------------------------------
 
+variable "domain" {
+  description = "Root domain. Its Route 53 hosted zone is looked up, never created."
+  type        = string
+  default     = "beast-fit.com"
+}
+
+variable "github_owner" {
+  description = "GitHub account serving Pages — the www CNAME target, <owner>.github.io."
+  type        = string
+  default     = "primetime-run"
+}
+
+variable "point_dns_at_pages" {
+  description = <<-EOT
+    Point the domain at GitHub Pages.
+
+    FALSE until the cutover. Setting this true takes the live WordPress site
+    offline the moment DNS propagates, so it is a deliberate, separate act
+    rather than a side effect of applying this stack for its SES records.
+
+      terraform apply -var 'point_dns_at_pages=true'
+
+    Before flipping it, set the custom domain in the repository's Pages
+    settings. The DNS alone is not enough — GitHub has to know the hostname
+    belongs to that Pages site, and the failure mode when it does not is a
+    "Site not found" page that looks exactly like a DNS problem.
+  EOT
+  type        = bool
+  default     = false
+}
+
 variable "mail_subdomain" {
   description = <<-EOT
     Subdomain SES sends from, e.g. mail.beast-fit.com.
