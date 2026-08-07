@@ -92,6 +92,16 @@ const full = addressLine()
     </address>
   </div>
 
+  {/* Between the location and the calendar options, deliberately.
+
+      Someone who has opened this is already interested in a specific class —
+      that is the moment a prompt about training lands, rather than buried on a
+      page they would have to go looking for. Above the calendar buttons so it
+      is read before the task is finished and the dialog closed. */}
+  <p class="dlg-cta">
+    Need a plan? <a href="/training/">Start training</a> now!
+  </p>
+
   <div class="opts" data-dlg-opts></div>
 </dialog>
 
@@ -442,6 +452,17 @@ const full = addressLine()
     float: right; background: transparent; border: 0; color: var(--text-muted);
     font-size: 1.5rem; line-height: 1; cursor: pointer; padding: 0;
   }
+  /* Sits on the hairline between where the class is and how to save it —
+     related to both, part of neither. */
+  dialog[data-dialog] .dlg-cta {
+    margin: 0 0 1.25rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid var(--hairline);
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+  dialog[data-dialog] .dlg-cta a { font-weight: 700; }
+
   dialog[data-dialog] .opts { display: grid; gap: 0.5rem; }
   dialog[data-dialog] .opt {
     display: grid; gap: 0.3rem; text-align: left;
@@ -451,11 +472,14 @@ const full = addressLine()
   dialog[data-dialog] .opt strong { font-family: var(--display); font-weight: 700; font-size: 1rem; }
   dialog[data-dialog] .opt > span { color: var(--text-muted); font-size: 0.82rem; }
   dialog[data-dialog] .opt-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.4rem; }
+  /* Smaller than a page button. These are one of several ways to do the same
+     thing, listed three deep — at full size they dominated a dialog whose
+     actual content is the class name and where it is. */
   dialog[data-dialog] .opt-btn {
-    font: inherit; font-size: 0.85rem; font-weight: 700;
+    font: inherit; font-size: 0.75rem; font-weight: 700;
     background: var(--green); color: #0a0a0a; text-decoration: none;
     border: 1px solid var(--green); border-radius: 4px;
-    padding: 0.45rem 0.8rem; cursor: pointer;
+    padding: 0.3rem 0.6rem; cursor: pointer;
   }
   dialog[data-dialog] .opt-btn + .opt-btn {
     background: transparent; color: var(--link); border-color: currentColor;
