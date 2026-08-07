@@ -20,7 +20,7 @@
    from its own copy of the text and stamps the version it used.
 --------------------------------------------------------------------------- */
 
-import { createHash, randomUUID } from 'node:crypto'
+import { createHash, createHmac, randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
