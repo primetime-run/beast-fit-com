@@ -51,7 +51,19 @@ jobs:
 
       - uses: actions/configure-pages@v6
 
-      - run: npm ci --no-audit --no-fund
+      # `npm install`, not `npm ci` — the same choice as the other sites here,
+      # for the same reason.
+      #
+      # npm ci resolves peer dependencies differently on Linux than on macOS,
+      # and a lockfile generated here can be rejected there. `npm ci --dry-run`
+      # locally does not catch it: it passes on macOS and the failure only
+      # appears on the runner.
+      #
+      # The trade is that builds are not byte-reproducible from the lockfile.
+      # Acceptable here: `npm run build` regenerates the price catalog from
+      # data/training.yaml and `npm run verify-urls` fails the deploy if the
+      # output regresses, so a bad resolve does not publish silently.
+      - run: npm install --no-audit --no-fund
 
       # Regenerates infra/lambda/catalog.json from data/training.yaml, then
       # builds. The catalog is what the payment Lambda charges from, so this
