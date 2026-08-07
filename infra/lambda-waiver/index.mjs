@@ -336,6 +336,26 @@ async function buildPdf(record) {
     y -= 11
   }
 
+  /* Page numbers, added last because "of N" is not knowable until every page
+     exists. On a multi-page agreement this is not decoration: without it a
+     page can go missing from a printed or scanned copy and nobody can tell,
+     which is exactly the argument you would not want to be having about a
+     signed release. The version sits alongside for the same reason. */
+  {
+    const pages = doc.getPages()
+    const total = pages.length
+    pages.forEach((pg, i) => {
+      const label = `Page ${i + 1} of ${total}`
+      pg.drawText(safe(String(waiver.version)), {
+        x: M, y: M - 18, size: 7, font: body, color: rgb(0.5, 0.5, 0.5),
+      })
+      pg.drawText(label, {
+        x: PAGE.w - M - body.widthOfTextAtSize(label, 7),
+        y: M - 18, size: 7, font: body, color: rgb(0.5, 0.5, 0.5),
+      })
+    })
+  }
+
   /* Said out loud rather than left to be noticed. A waiver showing "?? Chen"
      with no explanation looks like corruption; with this line it is a known
      rendering limit and the real spelling is in the email. */
