@@ -581,7 +581,14 @@ export const handler = async (event) => {
             Data: rawEmail({
               from: WAIVER_FROM,
               to: WAIVER_TO,
-              subject: `Waiver signed: ${participantName}${isMinor ? ' (minor)' : ''}`,
+              /* The form collects one "Full name" field rather than separate
+                 first and last, so this is that name as entered.
+
+                 The minor marker stays on the end: it is the one thing about a
+                 waiver worth seeing without opening it, because it means the
+                 guardian section applies and the agreement itself has no
+                 guardian provision. */
+              subject: `New Waiver for ${participantName}${isMinor ? ' (minor)' : ''}`,
               text: summary,
               filename,
               pdf,
