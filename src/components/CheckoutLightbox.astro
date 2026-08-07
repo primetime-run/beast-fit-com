@@ -80,6 +80,21 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
 
   <p class="status" data-checkout-status hidden></p>
 
+  {/* Covers the frame once the card has been submitted.
+
+      role=alert so the state change is announced rather than only drawn — a
+      customer using a screen reader otherwise gets silence at the exact moment
+      they most need to know something is happening. */}
+  <div class="processing" data-checkout-processing hidden role="alert">
+    <div class="processing-box">
+      <span class="spinner" aria-hidden="true"></span>
+      <p><strong>Processing your payment…</strong></p>
+      <p class="processing-sub">
+        Do not close this window or press back. This can take a few moments.
+      </p>
+    </div>
+  </div>
+
   {/* name is what the POST targets; Authorize.Net renders into it. */}
   {/* scrolling is left to the browser. It used to be "no", which only worked
       because the frame was resized to fit its content — with a fixed
@@ -114,23 +129,53 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
     const status = dlg.querySelector('[data-checkout-status]')
     const loading = dlg.querySelector('[data-checkout-loading]')
     const summary = dlg.querySelector('[data-checkout-summary]')
+    const processing = dlg.querySelector('[data-checkout-processing]')
+    const closeBtn = dlg.querySelector('[data-checkout-close]')
+
+    /* Once the card is submitted there is no safe way out of this screen.
+     *
+     * The Pay button is inside Authorize.Net's iframe, so its click is not
+     * observable from here — what IS observable is the frame navigating away
+     * from the form, which is the submit. From that moment the charge may
+     * already have been authorised, and closing would leave someone believing
+     * they had cancelled something that in fact went through.
+     *
+     * So the close button goes, Escape is refused, and an overlay says what is
+     * happening. It is lifted again by transactResponse or cancel arriving, or
+     * by an error. */
+    let processingPayment = false
+
+    const setProcessing = (on) => {
+      processingPayment = on
+      processing.hidden = !on
+      closeBtn.hidden = on
+    }
 
     /* The frame is revealed when the hosted form has actually rendered in it,
        not when the POST is fired. The load event fires for about:blank too, so
        a flag tracks whether a form was submitted into it — otherwise the
        loader disappears the instant the dialog opens. */
     let awaitingForm = false
+    let formShown = false
     frame.addEventListener('load', () => {
-      if (!awaitingForm) return
-      awaitingForm = false
-      loading.hidden = true
-      frame.hidden = false
+      if (awaitingForm) {
+        awaitingForm = false
+        formShown = true
+        loading.hidden = true
+        frame.hidden = false
+        return
+      }
+      /* A second navigation once the form is up means the customer pressed
+         Pay and the gateway is working. */
+      if (formShown) setProcessing(true)
     })
 
     /* Loader visible, frame and error hidden. The starting state, and the
        state to return to when reopening — otherwise a second attempt after a
        failure opens straight onto the previous error. */
     const showLoading = () => {
+      setProcessing(false)
+      formShown = false
       summary.hidden = true
       loading.hidden = false
       frame.hidden = true
@@ -171,6 +216,7 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
     }
 
     const fail = (code) => {
+      setProcessing(false)
       /* The frame is empty here and the loader is lying — neither should stay
          on screen behind an error. */
       awaitingForm = false
@@ -199,14 +245,24 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
     const close = () => {
       dlg.close()
       awaitingForm = false
+      formShown = false
+      setProcessing(false)
       // Blank the frame so a closed overlay is never holding a live payment
       // session, and so reopening always starts clean.
       frame.src = 'about:blank'
     }
 
-    dlg.querySelector('[data-checkout-close]').addEventListener('click', close)
+    closeBtn.addEventListener('click', () => {
+      if (processingPayment) return
+      close()
+    })
+
+    /* Escape is always prevented — the default would close the dialog outright,
+       skipping the frame teardown in close(). While a payment is in flight it
+       is refused entirely. */
     dlg.addEventListener('cancel', (e) => {
       e.preventDefault()
+      if (processingPayment) return
       close()
     })
 
@@ -288,6 +344,17 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
 </script>
 
 <style>
+  /* [hidden] wins, everywhere in this component.
+   *
+   * The hidden attribute works through a UA rule of display:none, which any
+   * display declaration on the element overrides. That caught the dialog
+   * (a closed dialog left in the layout), the frame (an empty panel showing
+   * behind an error) and the close button (still clickable mid-payment) —
+   * three times, because every one of those needs an explicit display.
+   *
+   * !important is deliberate: hidden should not be a suggestion. */
+  [hidden] { display: none !important; }
+
   /* Full screen.
 
      The hosted form's width is not ours to set, so a narrow dialog around it
@@ -326,6 +393,9 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
        hiding it means a customer can see a field they cannot get to, with
        nothing to indicate why. */
     overflow: auto;
+
+    /* Positioning context for the processing overlay. */
+    position: fixed;
   }
 
   /* Scoped to [open], and it must be.
@@ -441,7 +511,6 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
     border-top: 3px solid var(--green);
     box-shadow: var(--shadow);
   }
-  .loading[hidden] { display: none; }
   .loading p { margin: 0; }
   .loading-sub { font-size: 0.85rem; color: var(--text-muted); }
 
@@ -473,7 +542,6 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
     background: var(--panel);
     border-bottom: 1px solid var(--hairline);
   }
-  .summary[hidden] { display: none; }
 
   .summary-inner {
     display: flex;
@@ -501,13 +569,40 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
     font-variant-numeric: tabular-nums;
   }
 
+  /* Over the frame, not instead of it. The form stays mounted underneath —
+     tearing it down mid-transaction would abandon whatever the gateway is
+     doing in there. */
+  .processing {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25rem;
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    backdrop-filter: blur(2px);
+  }
+
+  .processing-box {
+    max-width: 26rem;
+    width: 100%;
+    text-align: center;
+    padding: 2rem 1.5rem;
+    background: var(--surface);
+    border: 1px solid var(--edge);
+    border-top: 3px solid var(--green);
+    box-shadow: var(--shadow);
+  }
+  .processing-box p { margin: 0.35rem 0 0; }
+  .processing-sub { font-size: 0.85rem; color: var(--text-muted); }
+
   .status {
     margin: 0;
     padding: 1.5rem;
     text-align: center;
     color: var(--text-muted);
   }
-  .status[hidden] { display: none; }
 
   /* An error is not a loading message. It gets the panel treatment so it does
      not read as "still working" — the state people misread as "wait longer"
@@ -541,7 +636,6 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
   }
-  .status[hidden] { display: none; }
 
   /* Fills whatever is left under the brand bar, so the form is never sized by
      a message that might not arrive.
@@ -560,8 +654,6 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
    * stayed on screen while "hidden" — its green top border showing as a line
    * across the page behind the error. Same trap as declaring display on the
    * dialog itself, which kept the closed dialog in the layout. */
-  iframe[hidden] { display: none; }
-
   iframe {
     display: block;
     flex: 1;
