@@ -145,10 +145,6 @@ const jsonLd = {
         on a button that no longer exists. */}
     <div class="sent" data-sent hidden tabindex="-1">
       <h2>Thanks — we have your message.</h2>
-      <p>
-        We will be in touch shortly. If it is urgent, calling is faster than
-        waiting on email.
-      </p>
       <button type="button" class="btn ghost" data-again>Contact again</button>
     </div>
 
@@ -282,8 +278,7 @@ const jsonLd = {
      control the user tabbed to. */
   .sent:focus { outline: none; }
   .sent:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
-  .sent h2 { margin: 0 0 .5rem; font-size: 1.15rem; }
-  .sent p { margin: 0 0 1.25rem; color: var(--text-muted); }
+  .sent h2 { margin: 0 0 1.25rem; font-size: 1.15rem; }
 
   @keyframes sent-in {
     from { opacity: 0; transform: translateY(8px) scale(.985); }
