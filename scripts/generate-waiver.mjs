@@ -25,17 +25,22 @@ const LOGO_OUT = 'infra/lambda-waiver/logo.png'
 
 const doc = parseYaml(readFileSync(SRC, 'utf8'))
 
-for (const key of ['version', 'title', 'sections', 'acknowledgements']) {
+for (const key of ['version', 'title', 'paragraphs', 'acknowledgements']) {
   if (!doc[key]) throw new Error(`${SRC}: missing "${key}"`)
 }
-if (!Array.isArray(doc.sections) || doc.sections.length === 0) {
-  throw new Error(`${SRC}: sections must be a non-empty list`)
+if (!Array.isArray(doc.paragraphs) || doc.paragraphs.length === 0) {
+  throw new Error(`${SRC}: paragraphs must be a non-empty list`)
+}
+/* The name token has to survive into the PDF. Losing it would produce a
+   document naming nobody, which is worse than one that fails to build. */
+if (!doc.paragraphs.some((t) => String(t).includes('{{name}}'))) {
+  throw new Error(`${SRC}: no {{name}} token — the signer would not be named in the agreement`)
 }
 if (!Array.isArray(doc.acknowledgements) || doc.acknowledgements.length === 0) {
   throw new Error(`${SRC}: acknowledgements must be a non-empty list`)
 }
-for (const [i, s] of doc.sections.entries()) {
-  if (!s.heading || !s.body) throw new Error(`${SRC}: section ${i + 1} needs a heading and a body`)
+for (const [i, t] of doc.paragraphs.entries()) {
+  if (typeof t !== 'string' || !t.trim()) throw new Error(`${SRC}: paragraph ${i + 1} is empty`)
 }
 
 mkdirSync(dirname(OUT), { recursive: true })
@@ -43,6 +48,6 @@ writeFileSync(OUT, JSON.stringify(doc, null, 2) + '\n')
 copyFileSync(LOGO_SRC, LOGO_OUT)
 
 console.log(
-  `waiver: v${doc.version}, ${doc.sections.length} sections, ` +
+  `waiver: ${doc.version}, ${doc.paragraphs.length} paragraphs, ` +
     `${doc.acknowledgements.length} acknowledgements -> ${OUT}`
 )

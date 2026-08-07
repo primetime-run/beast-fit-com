@@ -258,14 +258,16 @@ async function buildPdf(record) {
   y -= 26
 
   // --- the agreement
-  text(waiver.title, { font: bold, size: 16, gap: 8 })
+  text(waiver.title, { font: bold, size: 13, gap: 6 })
   if (waiver.intro) text(waiver.intro, { size: 9.5, gap: 5, color: rgb(0.3, 0.3, 0.3) })
   y -= 10
 
-  for (const s of waiver.sections) {
+  /* Verbatim, unheaded, with the name written into the first paragraph where
+     the original has a blank line. Reproducing an attorney's document means
+     reproducing it — no headings added, no paragraphs merged. */
+  for (const para of waiver.paragraphs) {
     room(40)
-    text(s.heading, { font: bold, size: 11, gap: 5 })
-    text(s.body, { size: 9.5, gap: 4 })
+    text(para.replace(/\{\{name\}\}/g, record.participantName), { size: 9.5, gap: 4 })
     y -= 10
   }
 

@@ -144,7 +144,8 @@ export type WaiverDoc = {
   version: string
   title: string
   intro?: string
-  sections: { heading: string; body: string }[]
+  /** Reproduced verbatim; {{name}} stands in for the signer's name. */
+  paragraphs: string[]
   acknowledgements: string[]
 }
 export const waiver: WaiverDoc = parseYaml(readFileSync('data/waiver.yaml', 'utf8'))

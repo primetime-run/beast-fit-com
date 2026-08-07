@@ -28,12 +28,13 @@ const ENDPOINT = import.meta.env.PUBLIC_WAIVER_ENDPOINT ?? ''
   {waiver.intro && <p class="lede">{waiver.intro}</p>}
 
 
+  {/* Verbatim, and unheaded — the agreement is continuous prose and breaking
+      it into sections would be editing an attorney's document. The name token
+      is filled in live as it is typed, so what is on screen reads as the
+      agreement that will be signed rather than a form with a blank in it. */}
   <article class="terms">
-    {waiver.sections.map((s) => (
-      <section>
-        <h2>{s.heading}</h2>
-        <p>{s.body}</p>
-      </section>
+    {waiver.paragraphs.map((t) => (
+      <p set:html={t.replace(/\{\{name\}\}/g, '<span class="fill" data-name-fill>&#95;&#95;&#95;&#95;&#95;&#95;&#95;&#95;&#95;&#95;&#95;&#95;&#95;&#95;&#95;</span>')} />
     ))}
   </article>
 
@@ -149,6 +150,21 @@ const ENDPOINT = import.meta.env.PUBLIC_WAIVER_ENDPOINT ?? ''
   const dob = document.querySelector('[data-dob]')
   const acks = [...document.querySelectorAll('[data-ack]')]
   const again = document.querySelector('[data-again]')
+  const nameFills = [...document.querySelectorAll('[data-name-fill]')]
+  const nameInput = form.elements['participantName']
+
+  /* Write the name into the agreement as it is typed. The blank is what the
+     paper form has; on screen there is no reason to make somebody hold in
+     their head that it refers to them. */
+  const BLANK = '_'.repeat(15)
+  const syncName = () => {
+    const v = nameInput.value.trim()
+    for (const el of nameFills) {
+      el.textContent = v || BLANK
+      el.classList.toggle('is-filled', !!v)
+    }
+  }
+  nameInput.addEventListener('input', syncName)
 
   let renderedAt = Date.now()
 
@@ -193,6 +209,7 @@ const ENDPOINT = import.meta.env.PUBLIC_WAIVER_ENDPOINT ?? ''
        was posted. */
     renderedAt = Date.now()
 
+    syncName()
     form.querySelector('input')?.focus()
   })
 
@@ -445,9 +462,18 @@ const ENDPOINT = import.meta.env.PUBLIC_WAIVER_ENDPOINT ?? ''
 
 
   .terms { margin: 2rem 0; }
-  .terms section { margin-bottom: 1.5rem; }
-  .terms h2 { font-size: 1.05rem; margin: 0 0 .4rem; }
-  .terms p { margin: 0; color: var(--text-muted); }
+  .terms p { margin: 0 0 1.1rem; color: var(--text-muted); }
+
+  .fill {
+    font-family: var(--brand);
+    letter-spacing: .02em;
+    color: var(--text-muted);
+  }
+  .fill.is-filled {
+    color: var(--text);
+    border-bottom: 2px solid var(--green);
+    padding-bottom: 1px;
+  }
 
   form { max-width: 40rem; margin-top: 2.5rem; }
   .sub { font-size: 1rem; text-transform: uppercase; margin: 2rem 0 1rem; }

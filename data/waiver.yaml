@@ -1,80 +1,114 @@
 # ---------------------------------------------------------------------------
-# The waiver text.
+# The waiver.
 #
-# NOT DRAFTED BY A LAWYER. This is plain-English wording written to be clear
-# and complete rather than to be enforceable, and its enforceability has not
-# been assessed. It is in use pending review.
+# Attorney-drafted and reproduced VERBATIM. Do not reword, condense or reorder
+# any of it. `version` is the law firm's own document reference, which is what
+# ties a signature back to the exact draft that was signed.
 #
-# Points to put in front of whoever reviews it:
+# The document carries an integration clause — it "contains the entire
+# understanding" — so nothing else on the page may read as a term of it. An
+# earlier draft here had descriptive sections about outdoor risk, heat and
+# uneven ground; those were removed rather than left alongside, because
+# anything presented as part of the agreement can be argued to be part of the
+# agreement.
 #
-#   - Florida requires release language to be clear and unambiguous, and
-#     courts read it strictly against the party relying on it.
-#   - MINORS. Kirton v. Fields, 997 So. 2d 349 (Fla. 2008) held that a parent
-#     cannot bind a minor to a pre-injury release for a commercial activity.
-#     This gym trains under-18s, so the guardian section needs specific
-#     attention rather than boilerplate.
-#   - Outdoor, unshaded, year-round in Florida: heat illness, lightning,
-#     uneven ground and insects are foreseeable and worth naming.
-#   - Whether medical conditions should be collected at all. Asking creates a
-#     duty to act on the answer, and stores health data.
+# {{name}} is replaced with the participant's name, both on the page as it is
+# typed and in the PDF as it is signed. It stands in for the blank line in the
+# original.
 #
 # STRUCTURE
 #
-# One source, two outputs: /waiver/ renders this, and the PDF is generated
-# from the same file, so the page and the signed document cannot drift apart.
-# `version` is stamped into every PDF — if the text changes, you can still
-# tell which wording someone actually agreed to.
+# One source, two outputs: /waiver/ renders this and the PDF is generated from
+# the same file, so the page someone read and the document they signed cannot
+# drift apart. Every PDF carries this version plus a hash of the text.
+#
+# NOTE FOR WHOEVER MAINTAINS THIS
+#   - The corporate name here is "B.E.A.S.T. Fitness, Inc., a Florida
+#     corporation". The privacy policy elsewhere on the site says "Beast
+#     Fitness LLC". One of those is wrong and it is not for this file to
+#     decide which.
+#   - The agreement assumes the client resides in Florida.
+#   - Minors: this text has no guardian provision. The form collects one and
+#     the PDF records it, but whether a parent can bind a minor here is a
+#     question for the attorney — see Kirton v. Fields, 997 So. 2d 349
+#     (Fla. 2008).
 # ---------------------------------------------------------------------------
 
-version: "2026-08"
+version: "FTL:2274504:1"
 
-title: Release and Waiver of Liability
+title: >-
+  Release, Indemnification and Hold Harmless Agreement and Agreement for Use
+  of Name, Image and/or Likeness
+
 intro: >-
   Read this before taking part. It affects your legal rights. Ask us if
   anything is unclear.
 
-sections:
-  - heading: What the activity involves
-    body: >-
-      BEAST Fitness runs group fitness classes and personal training outdoors,
-      on a field, year round and in whatever weather the day brings. Sessions
-      involve strenuous physical exertion, which may include running, jumping,
-      lifting weights and body-weight exercise on uneven natural ground.
+paragraphs:
+  - >-
+    FOR GOOD AND VALUABLE CONSIDERATION, the receipt and sufficiency of which
+    are hereby acknowledged, {{name}}, an individual residing in the State of
+    Florida (“CLIENT”), on his/her own behalf and on behalf of his/her
+    respective heirs, representatives, executors, administrators and/or agents,
+    shall hereinafter release, indemnify, defend, protect and otherwise hold
+    harmless B.E.A.S.T. Fitness, Inc., a Florida corporation (“BEAST”), and its
+    respective officers, members, managers, representatives, executors,
+    administrators, agents, attorneys, successors and/or assigns, from any and
+    all past, present, and future actions, causes and causes of action, claims,
+    controversies, damages, judgments, executions, agreements, contractors,
+    promises, or suits of any kind or make whatsoever, in law or in equity, as
+    they now have, ever had, will ever have, from now until the end of time,
+    whether known or unknown, including the trial and appellate levels,
+    including any and all attorneys’ fees and costs incurred, in connection
+    with and/or otherwise related to any and all instruction, teaching,
+    technique, demonstration, directive, competition, and/or other activity
+    provided by BEAST to CLIENT.
 
-  - heading: Risks you are accepting
-    body: >-
-      Physical activity of this kind carries risk of injury, up to and
-      including serious injury, permanent disability and death. Training
-      outdoors in Florida adds heat exhaustion and heat stroke, dehydration,
-      sun exposure, lightning, insect bites and stings, and uneven or slippery
-      ground. This list is not exhaustive.
+  - >-
+    FOR GOOD AND VALUABLE CONSIDERATION, the receipt and sufficiency of which
+    are hereby acknowledged, CLIENT on his/her own behalf and on behalf of
+    his/her respective heirs, representatives, executors, administrators and/or
+    agents, shall hereinafter permit BEAST to use his/her name, image and/or
+    likeness for any promotional and/or marketing purposes and/or for any other
+    purposes that BEAST shall determine, in its sole and absolute discretion
+    and without limitation.
 
-  - heading: Your condition
-    body: >-
-      You confirm you are physically able to take part, that you have no
-      condition that makes this activity unsafe for you, and that you have
-      been advised to consult a doctor before starting any exercise programme.
-      You will stop and tell a trainer if you feel unwell.
+  - >-
+    IT IS FURTHER UNDERSTOOD AND AGREED that in making this Release,
+    Indemnification and Hold Harmless Agreement and Agreement for Use of Name,
+    Image and Likeness, CLIENT relies wholly upon his/her own judgment, belief
+    and knowledge of the nature, extent and duration of the facts and
+    circumstances in connection with the making hereon, and warrant that it has
+    not been influenced to any extent whatsoever in making this by any
+    representations or statements regarding said facts, or regarding any other
+    matters, made by the company who is hereby released, or by any person or
+    persons representing it.
 
-  - heading: Release
-    body: >-
-      In exchange for being allowed to take part, you agree to accept these
-      risks and to release BEAST Fitness LLC, its owners, trainers, employees
-      and agents from any claim for injury, illness, loss or damage arising
-      from your participation, other than where it is caused by their
-      recklessness or intentional wrongdoing. This applies to you and to
-      anyone claiming on your behalf. If any part of this release is held to
-      be unenforceable, the rest of it continues to apply.
+  - >-
+    IT IS FURTHER UNDERSTOOD AND AGREED that CLIENT has carefully read this
+    Release, Indemnification and Hold Harmless Agreement and Agreement for Use
+    of Name, Image and Likeness, know and understand its contents, and sign it
+    voluntarily as its own free act and deed and have been the afforded the
+    opportunity to seek advice of counsel.
 
-  - heading: Media
-    body: >-
-      Sessions are sometimes photographed or filmed for social media. Tell us
-      if you would rather not appear, and we will keep you out of it.
+  - >-
+    IT IS FURTHER UNDERSTOOD AND AGREED that this Release, Indemnification and
+    Hold Harmless Agreement and Agreement for Use of Name, Image and Likeness
+    shall be construed, interpreted and governed by Florida law, with venue for
+    any action arising out of or related to this Release, Indemnification and
+    Hold Harmless Agreement being the jurisdictional court lying situate in
+    Palm Beach County, Florida.
 
-# Ticked individually. Separate boxes rather than one blanket agreement, so
-# there is a record of what each person specifically acknowledged.
+  - >-
+    IT IS FURTHER UNDERSTOOD AND AGREED that Release, Indemnification and Hold
+    Harmless Agreement and Agreement for Use of Name, Image and Likeness
+    contains the entire understanding of CLIENT and BEAST. The terms of this
+    Release, Indemnification and Hold Harmless Agreement and Agreement for Use
+    of Name, Image and Likeness are contractual and not a mere recital.
+
+# Ticked individually, and worded from the document's own paragraphs rather
+# than invented — the fourth paragraph is the one that recites having read it,
+# understood it, signed voluntarily and had the chance to take advice. Separate
+# boxes so there is a record of what was specifically acknowledged.
 acknowledgements:
-  - I have read and understood this waiver in full.
-  - I understand the risks of outdoor exercise, including heat and uneven ground.
-  - I confirm I am physically fit to take part.
-  - I am signing this freely and without inducement.
+  - I have carefully read this agreement and understand its contents.
