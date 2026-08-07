@@ -119,7 +119,21 @@ const jsonLd = {
                   data-name={s.special ? s.name : undefined}
                   data-dur={s.special ? String(s.duration) : undefined}
                 >
-                  Add
+                  {/* Icon only. The aria-label above already reads "Add
+                      <class>, <day> at <time>, to your calendar", so the word
+                      added nothing for a screen reader and the row is tighter
+                      without it.
+
+                      aria-hidden on the glyph, or it becomes a second and less
+                      useful name for the same link. */}
+                  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+                    <rect x="3" y="5" width="18" height="16" rx="2" fill="none"
+                          stroke="currentColor" stroke-width="2"></rect>
+                    <path d="M3 10h18M8 3v4M16 3v4" fill="none" stroke="currentColor"
+                          stroke-width="2" stroke-linecap="round"></path>
+                    <path d="M12 13v5M9.5 15.5h5" fill="none" stroke="currentColor"
+                          stroke-width="2" stroke-linecap="round"></path>
+                  </svg>
                 </a>
               </span>
             </div>
@@ -315,16 +329,22 @@ const jsonLd = {
   .n-add { display: flex; align-items: center; gap: .5rem; }
 
   /* The only interactive thing in the row. */
+  /* Square, so the icon sits centred rather than in a box shaped for text.
+     44px is the smallest comfortable touch target; this is 34px plus the row's
+     own spacing, which keeps it tappable without dominating the row. */
   .n-cal {
-    font-family: var(--brand); font-size: .7rem;
-    text-transform: uppercase; letter-spacing: .07em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.1rem;
+    height: 2.1rem;
     color: var(--link);
     text-decoration: none;
     background: transparent;
     border: 1px solid var(--edge);
-    padding: .3rem .7rem;
-    white-space: nowrap;
+    flex: none;
   }
+  .n-cal svg { display: block; }
   .n-cal:hover,
   .n-cal:focus-visible {
     background: var(--green);
