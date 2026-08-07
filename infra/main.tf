@@ -498,11 +498,18 @@ data "aws_iam_policy_document" "waiver" {
     resources = ["${aws_s3_bucket.waivers.arn}/waivers/*"]
   }
 
-  # The From address as well as the domain — see the note on the webhook
+  # SendRawEmail as well as SendEmail.
+  #
+  # An attachment requires Raw content, and SESv2 authorises a raw send against
+  # ses:SendRawEmail — granting only ses:SendEmail produces AccessDenied on
+  # every waiver while the contact form, which sends Simple content, keeps
+  # working. The two forms of the same API call need two different permissions.
+  #
+  # The From address as well as the domain, for the reason on the webhook
   # policy. The recipient identity covers the gym's inbox while SES is in the
   # sandbox.
   statement {
-    actions = ["ses:SendEmail"]
+    actions = ["ses:SendEmail", "ses:SendRawEmail"]
     resources = [
       aws_sesv2_email_identity.domain.arn,
       "${aws_sesv2_email_identity.domain.arn}/*",

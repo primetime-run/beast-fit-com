@@ -259,7 +259,11 @@ async function buildPdf(record) {
 
   // --- the agreement
   text(waiver.title, { font: bold, size: 13, gap: 6 })
-  if (waiver.intro) text(waiver.intro, { size: 9.5, gap: 5, color: rgb(0.3, 0.3, 0.3) })
+  /* intro is deliberately not rendered here. "Read this before taking part"
+     is guidance for someone about to sign a form on a website; on the signed
+     document it is noise, and on a page carrying an integration clause it is
+     one more line that is not part of the agreement. It stays on the web
+     page, where it is doing its job. */
   y -= 10
 
   /* Verbatim, unheaded, with the name written into the first paragraph where
@@ -543,7 +547,7 @@ export const handler = async (event) => {
         })
       )
     } catch (err) {
-      console.error('archive failed', err.name)
+      console.error('archive failed', err.name, err.message)
       return reply(502, { error: 'archive_failed' }, allowed)
     }
   } else {
@@ -590,7 +594,12 @@ export const handler = async (event) => {
     /* Best effort, because the archive already succeeded. Failing the request
        here would tell someone their waiver did not go through when it is
        safely stored, and they would sign again. */
-    console.error('waiver email failed (PDF is archived)', err.name)
+    /* Name AND message. The previous version logged only err.name, which
+       turned an IAM misconfiguration into the single word
+       "AccessDeniedException" with no indication of which action or resource
+       was refused. SES error text names those and never echoes the message
+       body, so this stays clear of the payload. */
+    console.error('waiver email failed (PDF is archived)', err.name, err.message)
   }
 
   /* Off until SES production access: this goes to an address nobody verified,
@@ -616,7 +625,7 @@ export const handler = async (event) => {
         })
       )
     } catch (err) {
-      console.error('signer copy failed', err.name)
+      console.error('signer copy failed', err.name, err.message)
     }
   }
 
