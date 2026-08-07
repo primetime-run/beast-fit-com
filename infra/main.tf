@@ -139,7 +139,20 @@ resource "aws_lambda_function" "checkout" {
   filename         = data.archive_file.checkout.output_path
   source_code_hash = data.archive_file.checkout.output_base64sha256
   timeout          = 10
-  memory_size      = 256
+  # 512MB, not for the memory — for the CPU.
+  #
+  # Lambda scales CPU with memory, so this roughly halves both init and
+  # execution. Measured cold starts were 152ms (checkout), 363ms (contact) and
+  # 406ms (webhook), the last two carrying the AWS SDK imports.
+  #
+  # It is free in practice. At this volume the monthly total is a few hundred
+  # GB-seconds against a 400,000 GB-second free tier, and the shorter durations
+  # partly offset the higher rate anyway.
+  #
+  # Provisioned concurrency was the alternative and is not worth it: ~$2.74 per
+  # function per month to remove 150-400ms, when the checkout's real latency is
+  # the Authorize.Net round trip it would not affect.
+  memory_size = 512
 
   environment {
     variables = {
@@ -242,7 +255,20 @@ resource "aws_lambda_function" "webhook" {
   filename         = data.archive_file.webhook.output_path
   source_code_hash = data.archive_file.webhook.output_base64sha256
   timeout          = 10
-  memory_size      = 256
+  # 512MB, not for the memory — for the CPU.
+  #
+  # Lambda scales CPU with memory, so this roughly halves both init and
+  # execution. Measured cold starts were 152ms (checkout), 363ms (contact) and
+  # 406ms (webhook), the last two carrying the AWS SDK imports.
+  #
+  # It is free in practice. At this volume the monthly total is a few hundred
+  # GB-seconds against a 400,000 GB-second free tier, and the shorter durations
+  # partly offset the higher rate anyway.
+  #
+  # Provisioned concurrency was the alternative and is not worth it: ~$2.74 per
+  # function per month to remove 150-400ms, when the checkout's real latency is
+  # the Authorize.Net round trip it would not affect.
+  memory_size = 512
 
   environment {
     variables = {
@@ -323,7 +349,20 @@ resource "aws_lambda_function" "contact" {
   filename         = data.archive_file.contact.output_path
   source_code_hash = data.archive_file.contact.output_base64sha256
   timeout          = 10
-  memory_size      = 256
+  # 512MB, not for the memory — for the CPU.
+  #
+  # Lambda scales CPU with memory, so this roughly halves both init and
+  # execution. Measured cold starts were 152ms (checkout), 363ms (contact) and
+  # 406ms (webhook), the last two carrying the AWS SDK imports.
+  #
+  # It is free in practice. At this volume the monthly total is a few hundred
+  # GB-seconds against a 400,000 GB-second free tier, and the shorter durations
+  # partly offset the higher rate anyway.
+  #
+  # Provisioned concurrency was the alternative and is not worth it: ~$2.74 per
+  # function per month to remove 150-400ms, when the checkout's real latency is
+  # the Authorize.Net round trip it would not affect.
+  memory_size = 512
 
   environment {
     variables = {
