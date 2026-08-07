@@ -344,17 +344,6 @@ const endpoint = import.meta.env.PUBLIC_CHECKOUT_ENDPOINT ?? ''
 </script>
 
 <style>
-  /* [hidden] wins, everywhere in this component.
-   *
-   * The hidden attribute works through a UA rule of display:none, which any
-   * display declaration on the element overrides. That caught the dialog
-   * (a closed dialog left in the layout), the frame (an empty panel showing
-   * behind an error) and the close button (still clickable mid-payment) —
-   * three times, because every one of those needs an explicit display.
-   *
-   * !important is deliberate: hidden should not be a suggestion. */
-  [hidden] { display: none !important; }
-
   /* Full screen.
 
      The hosted form's width is not ours to set, so a narrow dialog around it

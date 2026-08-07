@@ -135,6 +135,23 @@ const jsonLd = {
       </div>
     </form>
 
+    {/* Replaces the form on success. `hidden` in the markup rather than via
+        CSS, so it is genuinely absent without JavaScript — and without JS the
+        form never submits by fetch anyway, so this must never be the only
+        thing on the page.
+
+        tabindex="-1" is for script focus, not for tabbing to. Swapping the
+        form out silently would leave a keyboard or screen-reader user focused
+        on a button that no longer exists. */}
+    <div class="sent" data-sent hidden tabindex="-1">
+      <h2>Thanks — we have your message.</h2>
+      <p>
+        We will be in touch shortly. If it is urgent, calling is faster than
+        waiting on email.
+      </p>
+      <button type="button" class="btn ghost" data-again>Contact again</button>
+    </div>
+
     <aside class="details">
       <Directions />
 
@@ -158,6 +175,8 @@ const jsonLd = {
   const form = document.getElementById('contact-form')
   const status = document.querySelector('[data-status]')
   const select = document.querySelector('[data-topic]')
+  const sent = document.querySelector('[data-sent]')
+  const again = document.querySelector('[data-again]')
 
   /* Pre-select the topic from ?topic=<id>. Compared against the options that
      actually exist, so a junk value in the URL just leaves the default. */
@@ -169,7 +188,7 @@ const jsonLd = {
 
   /* Stamped when the page renders. The server rejects anything submitted
      within a few seconds of this — no human fills a form that fast. */
-  const renderedAt = Date.now()
+  let renderedAt = Date.now()
 
   function say(msg, kind) {
     status.textContent = msg
@@ -202,7 +221,17 @@ const jsonLd = {
       })
       if (res.ok) {
         form.reset()
-        say('Thanks — we will be in touch shortly.', 'ok')
+        if (wanted) select.value = wanted
+        if (window.turnstile) window.turnstile.reset()
+
+        // The panel carries the message now; leaving both announces it twice.
+        say('')
+
+        form.hidden = true
+        sent.hidden = false
+        // Focus follows the content, or the change is invisible to anyone not
+        // looking at the screen.
+        sent.focus()
       } else {
         say('Something went wrong sending that. Please try again.', 'err')
       }
@@ -212,9 +241,60 @@ const jsonLd = {
       btn.disabled = false
     }
   })
+
+  again?.addEventListener('click', () => {
+    sent.hidden = true
+    form.hidden = false
+
+    // Re-stamp, or the server's minimum-fill-time check measures a second
+    // message from the original page load and waves it through however fast
+    // it is posted.
+    renderedAt = Date.now()
+
+    form.querySelector('input, textarea, select')?.focus()
+  })
+
+  again?.addEventListener('click', () => {
+    sent.hidden = true
+    form.hidden = false
+
+    // Re-stamp, or the server's minimum-fill-time check measures a second
+    // message from the original page load and waves it through however fast
+    // it is posted.
+    renderedAt = Date.now()
+
+    form.querySelector('input, textarea, select')?.focus()
+  })
 </script>
 
 <style>
+  /* Same measure as the form, so swapping one for the other does not shift
+     the column width. */
+  .sent {
+    max-width: 34rem;
+    background: var(--surface);
+    border: 1px solid var(--edge);
+    border-left: 3px solid var(--green);
+    padding: 1.5rem;
+    animation: sent-in .32s cubic-bezier(.2, .7, .3, 1) both;
+  }
+  /* Focused from script, so it must not draw a ring as though it were a
+     control the user tabbed to. */
+  .sent:focus { outline: none; }
+  .sent:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+  .sent h2 { margin: 0 0 .5rem; font-size: 1.15rem; }
+  .sent p { margin: 0 0 1.25rem; color: var(--text-muted); }
+
+  @keyframes sent-in {
+    from { opacity: 0; transform: translateY(8px) scale(.985); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  /* Motion is decoration here — the panel must still appear without it. */
+  @media (prefers-reduced-motion: reduce) {
+    .sent { animation: none; }
+  }
+
   .page-title { font-size: clamp(2rem, 6vw, 3rem); text-transform: uppercase; }
 
   /* Baseline-aligned so the handle sits on the title's baseline rather than

@@ -265,7 +265,14 @@ const isCurrent = (href: string) =>
         height: 2px;
         background: currentColor;
         border-radius: 2px;
+        transition: transform .22s cubic-bezier(.2, .7, .3, 1), opacity .16s linear;
       }
+
+      /* Three bars fold into a cross. The state is already in aria-expanded,
+         so this is purely showing what that says. */
+      .burger[aria-expanded='true'] span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+      .burger[aria-expanded='true'] span:nth-child(2) { opacity: 0; }
+      .burger[aria-expanded='true'] span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
 
       @media (max-width: 48rem) {
         .burger {
@@ -290,6 +297,26 @@ const isCurrent = (href: string) =>
 
         .nav.is-open {
           display: flex;
+          animation: nav-in .22s cubic-bezier(.2, .7, .3, 1) both;
+        }
+
+        /* Each item arrives just after the panel, staggered. Cheap to do and
+           it gives the menu a sense of assembling rather than appearing. */
+        .nav.is-open a {
+          animation: nav-item-in .26s cubic-bezier(.2, .7, .3, 1) both;
+        }
+        .nav.is-open a:nth-child(1) { animation-delay: .04s; }
+        .nav.is-open a:nth-child(2) { animation-delay: .08s; }
+        .nav.is-open a:nth-child(3) { animation-delay: .12s; }
+        .nav.is-open a:nth-child(4) { animation-delay: .16s; }
+
+        @keyframes nav-in {
+          from { opacity: 0; transform: translateY(-8px); }
+          to   { opacity: 1; transform: none; }
+        }
+        @keyframes nav-item-in {
+          from { opacity: 0; transform: translateY(-6px); }
+          to   { opacity: 1; transform: none; }
         }
 
         .nav a {
@@ -305,6 +332,14 @@ const isCurrent = (href: string) =>
         .nav a[aria-current='page'] {
           border-bottom-color: var(--header-hairline);
         }
+      }
+
+      /* Motion here is decoration. Everything must still work without it, so
+         these are turned off rather than slowed down. */
+      @media (prefers-reduced-motion: reduce) {
+        .burger span { transition: none; }
+        .nav.is-open,
+        .nav.is-open a { animation: none; }
       }
 
       :global(body.nav-open) {

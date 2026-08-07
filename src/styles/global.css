@@ -251,6 +251,22 @@ a:focus-visible {
   --page-max: 82rem;
 }
 
+/* [hidden] wins over any display declaration.
+ *
+ * The hidden attribute works through a UA rule of display:none, which any
+ * display an element sets for itself will beat. That has caught four things
+ * here — a closed dialog left in the layout, an empty payment frame showing
+ * behind an error, a close button still clickable mid-payment, and a contact
+ * form that would not go away once submitted. Each needs an explicit display
+ * for its own layout, so each one broke the same way.
+ *
+ * !important because hidden should not be a suggestion, and one rule here is
+ * cheaper than remembering the trap in every component.
+ */
+[hidden] {
+  display: none !important;
+}
+
 .wrap {
   max-width: var(--page-max);
   margin-inline: auto;
