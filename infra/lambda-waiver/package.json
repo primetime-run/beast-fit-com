@@ -1,0 +1,9 @@
+{
+  "name": "beast-fit-waiver",
+  "private": true,
+  "type": "module",
+  "description": "Bundled into the deploy zip. pdf-lib is pure JS with no native build, which is what makes it safe to zip from a Mac and run on Lambda's Linux.",
+  "dependencies": {
+    "pdf-lib": "^1.17.1"
+  }
+}

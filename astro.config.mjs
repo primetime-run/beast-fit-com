@@ -9,7 +9,12 @@ export default defineConfig({
          test, the receipt page and the iframe communicator. They already send
          noindex, but a page listed in the sitemap and then refused is a
          Search Console error every crawl, so keep them out of both. */
-      filter: (page) => !new URL(page).pathname.startsWith('/checkout/'),
+      filter: (page) => {
+        const p = new URL(page).pathname
+        // Both are noindex. A page listed in the sitemap and then refused is a
+        // Search Console error on every crawl.
+        return !p.startsWith('/checkout/') && p !== '/waiver/'
+      },
     }),
   ],
 

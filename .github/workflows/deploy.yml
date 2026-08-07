@@ -77,6 +77,7 @@ jobs:
           # build log useless.
           PUBLIC_CHECKOUT_ENDPOINT: ${{ vars.PUBLIC_CHECKOUT_ENDPOINT }}
           PUBLIC_CONTACT_ENDPOINT: ${{ vars.PUBLIC_CONTACT_ENDPOINT }}
+          PUBLIC_WAIVER_ENDPOINT: ${{ vars.PUBLIC_WAIVER_ENDPOINT }}
 
       # Fails the deploy if any URL that was published before stopped
       # resolving, or if a page lost its title or description.

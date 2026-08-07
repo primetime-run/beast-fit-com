@@ -23,6 +23,10 @@ provider "aws" {
   }
 }
 
+# Used to make the waiver bucket name globally unique — S3 names are shared
+# across every AWS account, so "beast-fit-waivers" alone would collide.
+data "aws_caller_identity" "current" {}
+
 locals {
   checkout_name = "beast-fit-checkout"
   webhook_name  = "beast-fit-webhook"
@@ -388,5 +392,163 @@ resource "aws_lambda_function_url" "contact" {
 
 resource "aws_cloudwatch_log_group" "contact" {
   name              = "/aws/lambda/${local.contact_name}"
+  retention_in_days = 14
+}
+
+# ---------------------------------------------------------------------------
+# Waiver
+#
+# Renders a signed PDF, archives it, emails it. The archive is the point: an
+# emailed waiver is a notification, and an inbox gets migrated, pruned and
+# lost. This bucket is what you produce in a dispute years later.
+# ---------------------------------------------------------------------------
+
+resource "aws_s3_bucket" "waivers" {
+  bucket = "beast-fit-waivers-${data.aws_caller_identity.current.account_id}"
+
+  lifecycle {
+    # These are legal records. Destroying the bucket destroys evidence.
+    prevent_destroy = true
+  }
+}
+
+# Nothing here is ever public. Signed waivers carry names, dates of birth and
+# emergency contacts; a bucket policy mistake would expose all of it at once.
+resource "aws_s3_bucket_public_access_block" "waivers" {
+  bucket                  = aws_s3_bucket.waivers.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# Versioning so an overwrite or a delete is recoverable — the document has to
+# survive mistakes, not just disk failures.
+resource "aws_s3_bucket_versioning" "waivers" {
+  bucket = aws_s3_bucket.waivers.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "waivers" {
+  bucket = aws_s3_bucket.waivers.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+# No expiry rule on the objects themselves. How long a signed waiver must be
+# kept is a legal question, not an infrastructure one, and quietly deleting
+# them on a schedule nobody chose is worse than paying for storage. Old
+# versions of a replaced file are cleaned up; the current one never is.
+resource "aws_s3_bucket_lifecycle_configuration" "waivers" {
+  bucket     = aws_s3_bucket.waivers.id
+  depends_on = [aws_s3_bucket_versioning.waivers]
+
+  rule {
+    id     = "expire-noncurrent-versions"
+    status = "Enabled"
+    filter {}
+    noncurrent_version_expiration {
+      noncurrent_days = 365
+    }
+  }
+}
+
+# pdf-lib has to be in the zip. Bundling is triggered by a change to the
+# lockfile, so a fresh clone or a dependency bump reinstalls before archiving
+# rather than shipping whatever happens to be on disk.
+resource "terraform_data" "waiver_deps" {
+  triggers_replace = [
+    filemd5("${path.module}/lambda-waiver/package.json"),
+  ]
+
+  provisioner "local-exec" {
+    command = "npm --prefix ${path.module}/lambda-waiver install --omit=dev --no-audit --no-fund"
+  }
+}
+
+data "archive_file" "waiver" {
+  depends_on  = [terraform_data.waiver_deps]
+  type        = "zip"
+  source_dir  = "${path.module}/lambda-waiver"
+  output_path = "${path.module}/.build/waiver.zip"
+}
+
+resource "aws_iam_role" "waiver" {
+  name               = "beast-fit-waiver"
+  assume_role_policy = data.aws_iam_policy_document.assume.json
+}
+
+resource "aws_iam_role_policy_attachment" "waiver_logs" {
+  role       = aws_iam_role.waiver.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+data "aws_iam_policy_document" "waiver" {
+  # Write only, and only into this bucket. The function has no reason to read
+  # back what it has stored, and not granting GetObject means a compromised
+  # function cannot enumerate everyone who ever signed.
+  statement {
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.waivers.arn}/waivers/*"]
+  }
+
+  # The From address as well as the domain — see the note on the webhook
+  # policy. The recipient identity covers the gym's inbox while SES is in the
+  # sandbox.
+  statement {
+    actions = ["ses:SendEmail"]
+    resources = [
+      aws_sesv2_email_identity.domain.arn,
+      "${aws_sesv2_email_identity.domain.arn}/*",
+      aws_sesv2_email_identity.recipients[var.contact_to].arn,
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "waiver" {
+  name   = "archive-and-send"
+  role   = aws_iam_role.waiver.id
+  policy = data.aws_iam_policy_document.waiver.json
+}
+
+resource "aws_lambda_function" "waiver" {
+  function_name    = "beast-fit-waiver"
+  role             = aws_iam_role.waiver.arn
+  handler          = "index.handler"
+  runtime          = "nodejs22.x"
+  filename         = data.archive_file.waiver.output_path
+  source_code_hash = data.archive_file.waiver.output_base64sha256
+
+  # Longer and larger than the others: this one renders a PDF, and pdf-lib's
+  # font work is CPU-bound.
+  timeout     = 20
+  memory_size = 1024
+
+  environment {
+    variables = {
+      WAIVER_TO       = var.contact_to
+      WAIVER_FROM     = "BEAST Fitness <no-reply@${var.mail_domain}>"
+      ARCHIVE_BUCKET  = aws_s3_bucket.waivers.id
+      ALLOWED_ORIGINS = join(",", var.allowed_origins)
+      # "on" only once SES production access is granted — the signer's address
+      # is not verified, and the sandbox refuses it.
+      SIGNER_COPY  = var.waiver_signer_copy ? "on" : "off"
+      NODE_OPTIONS = "--enable-source-maps"
+    }
+  }
+}
+
+resource "aws_lambda_function_url" "waiver" {
+  function_name      = aws_lambda_function.waiver.function_name
+  authorization_type = "NONE"
+}
+
+resource "aws_cloudwatch_log_group" "waiver" {
+  name              = "/aws/lambda/beast-fit-waiver"
   retention_in_days = 14
 }

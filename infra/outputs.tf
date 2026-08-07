@@ -132,3 +132,13 @@ output "nameservers" {
   EOT
   value       = var.manage_dns ? aws_route53_zone.main[0].name_servers : []
 }
+
+output "waiver_endpoint" {
+  description = "Set as the PUBLIC_WAIVER_ENDPOINT repository variable."
+  value       = aws_lambda_function_url.waiver.function_url
+}
+
+output "waiver_archive" {
+  description = "Where signed waivers are stored. Private, versioned, encrypted."
+  value       = "s3://${aws_s3_bucket.waivers.id}/waivers/"
+}

@@ -1,0 +1,79 @@
+# ---------------------------------------------------------------------------
+# The waiver text.
+#
+# *** PLACEHOLDER — NOT LEGAL TEXT. REPLACE BEFORE USE. ***
+#
+# Everything below was written to give the form and the PDF something to
+# render. It has not been drafted or reviewed by a lawyer and should not be
+# relied on. A release that does not hold up is worse than none, because it
+# leads a gym to believe it is covered when it is not.
+#
+# Points worth putting in front of whoever drafts the real thing:
+#
+#   - Florida requires release language to be clear and unambiguous, and
+#     courts read it strictly against the party relying on it.
+#   - MINORS. Kirton v. Fields, 997 So. 2d 349 (Fla. 2008) held that a parent
+#     cannot bind a minor to a pre-injury release for a commercial activity.
+#     This gym trains under-18s, so the guardian section needs specific
+#     attention rather than boilerplate.
+#   - Outdoor, unshaded, year-round in Florida: heat illness, lightning,
+#     uneven ground and insects are foreseeable and worth naming.
+#   - Whether medical conditions should be collected at all. Asking creates a
+#     duty to act on the answer, and stores health data.
+#
+# STRUCTURE
+#
+# One source, two outputs: /waiver/ renders this, and the PDF is generated
+# from the same file, so the page and the signed document cannot drift apart.
+# `version` is stamped into every PDF — if the text changes, you can still
+# tell which wording someone actually agreed to.
+# ---------------------------------------------------------------------------
+
+version: "PLACEHOLDER-2026-08"
+
+title: Release and Waiver of Liability
+intro: >-
+  Read this before taking part. It affects your legal rights. Ask us if
+  anything is unclear.
+
+sections:
+  - heading: What the activity involves
+    body: >-
+      BEAST Fitness runs group fitness classes and personal training outdoors,
+      on a field, year round and in whatever weather the day brings. Sessions
+      involve strenuous physical exertion, which may include running, jumping,
+      lifting weights and body-weight exercise on uneven natural ground.
+
+  - heading: Risks you are accepting
+    body: >-
+      Physical activity of this kind carries risk of injury, up to and
+      including serious injury, permanent disability and death. Training
+      outdoors in Florida adds heat exhaustion and heat stroke, dehydration,
+      sun exposure, lightning, insect bites and stings, and uneven or slippery
+      ground. This list is not exhaustive.
+
+  - heading: Your condition
+    body: >-
+      You confirm you are physically able to take part, that you have no
+      condition that makes this activity unsafe for you, and that you have
+      been advised to consult a doctor before starting any exercise programme.
+      You will stop and tell a trainer if you feel unwell.
+
+  - heading: Release
+    body: >-
+      PLACEHOLDER. The operative release, waiver and indemnity language goes
+      here and must be drafted by an attorney licensed in Florida. Do not go
+      live with this paragraph as it stands.
+
+  - heading: Media
+    body: >-
+      Sessions are sometimes photographed or filmed for social media. Tell us
+      if you would rather not appear, and we will keep you out of it.
+
+# Ticked individually. Separate boxes rather than one blanket agreement, so
+# there is a record of what each person specifically acknowledged.
+acknowledgements:
+  - I have read and understood this waiver in full.
+  - I understand the risks of outdoor exercise, including heat and uneven ground.
+  - I confirm I am physically fit to take part.
+  - I am signing this freely and without inducement.

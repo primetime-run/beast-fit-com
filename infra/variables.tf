@@ -256,3 +256,16 @@ variable "legacy_www_target" {
   type        = string
   default     = "d29euly5651axl.cloudfront.net"
 }
+
+variable "waiver_signer_copy" {
+  description = <<-EOT
+    Email the signed waiver to the person who signed it as well as the gym.
+
+    False until SES production access is granted: it goes to an address nobody
+    verified and the sandbox refuses it. Arguably the right default for a legal
+    document — someone signing away rights should hold a copy of what they
+    signed — so this is worth turning on once the account allows it.
+  EOT
+  type        = bool
+  default     = false
+}

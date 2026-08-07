@@ -19,3 +19,8 @@ infra/.build/
 
 # os
 .DS_Store
+
+# Bundled into the waiver deploy zip by terraform, not committed.
+infra/lambda-waiver/node_modules/
+infra/lambda-waiver/waiver.json
+infra/lambda-waiver/logo.png

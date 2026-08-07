@@ -1,0 +1,336 @@
+---
+import Base from '../layouts/Base.astro'
+import { waiver } from '../lib/data'
+
+/*
+  The waiver.
+
+  The text comes from data/waiver.yaml, the same file scripts/generate-waiver.mjs
+  turns into the JSON the Lambda renders its PDF from. One source, so the page a
+  person reads and the document they sign are provably the same wording — and
+  the version stamped on the PDF says which.
+
+  Nothing here decides whether a guardian is required. The page reveals those
+  fields from the date of birth as a convenience; the Lambda derives the age
+  again and refuses a minor without a guardian regardless of what was posted.
+*/
+
+const ENDPOINT = import.meta.env.PUBLIC_WAIVER_ENDPOINT ?? ''
+const isPlaceholder = /PLACEHOLDER/i.test(JSON.stringify(waiver))
+---
+
+<Base
+  title="Waiver — BEAST Fitness"
+  description="Release and waiver of liability for classes and personal training at BEAST Fitness, Delray Beach."
+  noindex
+  width="prose"
+>
+  <h1 class="brand-title page-title">{waiver.title}</h1>
+  {waiver.intro && <p class="lede">{waiver.intro}</p>}
+
+  {isPlaceholder && (
+    <p class="draft" role="alert">
+      <strong>Draft.</strong> This wording is placeholder text pending review by
+      an attorney and is not a binding agreement. Do not collect signatures
+      against it.
+    </p>
+  )}
+
+  <article class="terms">
+    {waiver.sections.map((s) => (
+      <section>
+        <h2>{s.heading}</h2>
+        <p>{s.body}</p>
+      </section>
+    ))}
+  </article>
+
+  <form id="waiver-form" novalidate>
+    <h2 class="brand-title sub">Your details</h2>
+
+    <div class="row">
+      <label>
+        <span class="lbl">Full name <span class="req" aria-hidden="true">*</span></span>
+        <input type="text" name="participantName" required autocomplete="name" maxlength="100" />
+      </label>
+      <label>
+        <span class="lbl">Date of birth <span class="req" aria-hidden="true">*</span></span>
+        <input type="date" name="dob" required data-dob />
+      </label>
+    </div>
+
+    <div class="row">
+      <label>
+        <span class="lbl">Email <span class="req" aria-hidden="true">*</span></span>
+        <input type="email" name="email" required autocomplete="email" maxlength="160" />
+      </label>
+      <label>
+        <span class="lbl">Phone <span class="opt">optional</span></span>
+        <input type="tel" name="phone" autocomplete="tel" maxlength="40" />
+      </label>
+    </div>
+
+    <div class="row">
+      <label>
+        <span class="lbl">Emergency contact <span class="req" aria-hidden="true">*</span></span>
+        <input type="text" name="emergencyName" required maxlength="100" />
+      </label>
+      <label>
+        <span class="lbl">Their phone <span class="req" aria-hidden="true">*</span></span>
+        <input type="tel" name="emergencyPhone" required maxlength="40" />
+      </label>
+    </div>
+
+    {/* Revealed when the date of birth says under 18. Hidden by default rather
+        than absent, so the fields exist for anyone without JavaScript — and
+        the server checks the age itself either way. */}
+    <fieldset class="guardian" data-guardian hidden>
+      <legend>Parent or guardian</legend>
+      <p class="guardian-why">
+        The participant is under 18, so a parent or guardian must complete this
+        section.
+      </p>
+      <div class="row">
+        <label>
+          <span class="lbl">Guardian's full name <span class="req" aria-hidden="true">*</span></span>
+          <input type="text" name="guardianName" maxlength="100" />
+        </label>
+        <label>
+          <span class="lbl">Relationship <span class="req" aria-hidden="true">*</span></span>
+          <input type="text" name="guardianRelationship" maxlength="60" />
+        </label>
+      </div>
+      <label>
+        <span class="lbl">Guardian's signature — type full name <span class="req" aria-hidden="true">*</span></span>
+        <input type="text" name="guardianSignature" maxlength="100" />
+      </label>
+    </fieldset>
+
+    <h2 class="brand-title sub">Acknowledgements</h2>
+    {/* Separate boxes, not one blanket agreement. The PDF records each tick,
+        so there is a record of what was specifically acknowledged rather than
+        a single yes. */}
+    <ul class="acks">
+      {waiver.acknowledgements.map((a, i) => (
+        <li>
+          <label class="ack">
+            <input type="checkbox" data-ack value={String(i)} required />
+            <span>{a}</span>
+          </label>
+        </li>
+      ))}
+    </ul>
+
+    <label>
+      <span class="lbl">Signature — type your full name <span class="req" aria-hidden="true">*</span></span>
+      <input type="text" name="signature" required maxlength="100" autocomplete="off" />
+    </label>
+
+    <div class="hp" aria-hidden="true">
+      <label>Leave this empty <input type="text" name="company" tabindex="-1" autocomplete="off" /></label>
+    </div>
+
+    <div class="actions">
+      <button type="submit" class="btn">Sign waiver</button>
+      <p class="status" data-status role="status" aria-live="polite"></p>
+    </div>
+  </form>
+
+  <div class="sent" data-sent hidden tabindex="-1">
+    <h2>Waiver signed.</h2>
+    <p>A copy has been sent to the gym. Your reference is <strong data-ref></strong>.</p>
+    <p class="sent-links">
+      <a class="btn" href="/schedule/">See the schedule</a>
+      <a class="btn ghost" href="/training/">Training options</a>
+    </p>
+  </div>
+</Base>
+
+<script define:vars={{ ENDPOINT }}>
+  const form = document.getElementById('waiver-form')
+  const status = document.querySelector('[data-status]')
+  const sent = document.querySelector('[data-sent]')
+  const guardian = document.querySelector('[data-guardian]')
+  const dob = document.querySelector('[data-dob]')
+  const acks = [...document.querySelectorAll('[data-ack]')]
+
+  let renderedAt = Date.now()
+
+  const say = (msg, kind) => {
+    status.textContent = msg
+    status.className = 'status ' + (kind || '')
+  }
+
+  /** Whole years, in UTC, matching how the server computes it. */
+  const ageFrom = (value) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null
+    const [y, m, d] = value.split('-').map(Number)
+    const now = new Date()
+    let age = now.getUTCFullYear() - y
+    if (now.getUTCMonth() + 1 < m || (now.getUTCMonth() + 1 === m && now.getUTCDate() < d)) age -= 1
+    return age
+  }
+
+  /* Reveal the guardian section from the date of birth. A convenience only —
+     the server derives the age again and refuses a minor without a guardian,
+     so editing the page achieves nothing. */
+  const syncGuardian = () => {
+    const age = ageFrom(dob.value)
+    const minor = age !== null && age < 18
+    guardian.hidden = !minor
+    for (const el of guardian.querySelectorAll('input')) el.required = minor
+  }
+  dob.addEventListener('change', syncGuardian)
+  dob.addEventListener('input', syncGuardian)
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const data = Object.fromEntries(new FormData(form).entries())
+
+    const required = ['participantName', 'dob', 'email', 'emergencyName', 'emergencyPhone', 'signature']
+    if (required.some((k) => !String(data[k] ?? '').trim())) {
+      return say('Please fill in every required field.', 'err')
+    }
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(data.email))) {
+      return say('That email address does not look right.', 'err')
+    }
+    if (!acks.every((a) => a.checked)) {
+      return say('Please tick every acknowledgement — each one is recorded separately.', 'err')
+    }
+    if (!guardian.hidden) {
+      const g = ['guardianName', 'guardianRelationship', 'guardianSignature']
+      if (g.some((k) => !String(data[k] ?? '').trim())) {
+        return say('A parent or guardian must complete their section.', 'err')
+      }
+    }
+    if (!ENDPOINT) {
+      return say('This form is not connected yet. Please contact us to sign in person.', 'err')
+    }
+
+    const btn = form.querySelector('button[type="submit"]')
+    btn.disabled = true
+    say('Submitting…')
+
+    try {
+      const res = await fetch(ENDPOINT, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          ...data,
+          acknowledgements: acks.map((a) => a.checked),
+          renderedAt,
+        }),
+      })
+      const out = await res.json().catch(() => ({}))
+
+      if (res.ok) {
+        say('')
+        document.querySelector('[data-ref]').textContent = out.reference ?? '—'
+        form.hidden = true
+        sent.hidden = false
+        sent.focus()
+      } else {
+        const MESSAGES = {
+          guardian_required: 'A parent or guardian must complete their section.',
+          acknowledgements_required: 'Please tick every acknowledgement.',
+          dob_invalid: 'That date of birth does not look right.',
+          email_invalid: 'That email address does not look right.',
+          rate_limited: 'Too many attempts. Please wait a minute and try again.',
+          archive_failed: 'We could not store your waiver, so it has not been accepted. Please try again, or contact us.',
+        }
+        say(MESSAGES[out.error] ?? 'Something went wrong. Please try again, or contact us.', 'err')
+      }
+    } catch {
+      say('Could not reach the server. Please check your connection and try again.', 'err')
+    } finally {
+      btn.disabled = false
+    }
+  })
+</script>
+
+<style>
+  .page-title { font-size: clamp(1.9rem, 5vw, 2.6rem); text-transform: uppercase; }
+  .lede { color: var(--text-muted); }
+
+  .draft {
+    margin: 1.25rem 0;
+    padding: 1rem 1.25rem;
+    background: var(--surface);
+    border: 1px solid var(--edge);
+    border-left: 3px solid #d08a1f;
+  }
+
+  .terms { margin: 2rem 0; }
+  .terms section { margin-bottom: 1.5rem; }
+  .terms h2 { font-size: 1.05rem; margin: 0 0 .4rem; }
+  .terms p { margin: 0; color: var(--text-muted); }
+
+  form { max-width: 40rem; margin-top: 2.5rem; }
+  .sub { font-size: 1rem; text-transform: uppercase; margin: 2rem 0 1rem; }
+
+  .row { display: grid; gap: 1rem; grid-template-columns: 1fr 1fr; }
+  @media (max-width: 34rem) { .row { grid-template-columns: 1fr; } }
+
+  label { display: block; margin-bottom: 1rem; font-size: .9375rem; font-weight: 600; }
+  .lbl { display: block; }
+  .req { color: var(--danger); }
+  .opt { font-weight: 400; color: var(--text-muted); font-size: .8rem; }
+
+  input[type='text'], input[type='email'], input[type='tel'], input[type='date'] {
+    display: block; width: 100%; margin-top: .35rem;
+    padding: .6rem .7rem; font: inherit;
+    color: var(--text); background: var(--surface);
+    border: 1px solid var(--edge); border-radius: 4px;
+  }
+  input:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
+
+  .guardian {
+    margin: 0 0 1rem;
+    padding: 1.25rem;
+    border: 1px solid var(--edge);
+    border-left: 3px solid var(--green);
+    background: var(--surface-2);
+  }
+  .guardian legend {
+    font-weight: 700; font-size: .9rem; text-transform: uppercase;
+    letter-spacing: .05em; padding: 0 .4rem;
+  }
+  .guardian-why { margin: 0 0 1rem; font-size: .85rem; color: var(--text-muted); font-weight: 400; }
+
+  .acks { list-style: none; margin: 0 0 1.5rem; padding: 0; display: grid; gap: .6rem; }
+  .ack {
+    display: flex; gap: .7rem; align-items: flex-start;
+    margin: 0; font-weight: 400; font-size: .9rem;
+    padding: .7rem .8rem;
+    background: var(--surface); border: 1px solid var(--edge);
+  }
+  .ack input { margin: .2rem 0 0; flex: none; width: 1.05rem; height: 1.05rem; accent-color: var(--green); }
+
+  /* Off-screen rather than display:none — a hidden field a bot cannot see is
+     the point, and display:none is the first thing they skip. */
+  .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+
+  .actions { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+  .status { margin: 0; font-size: .9rem; }
+  .status.err { color: var(--danger); }
+
+  .sent {
+    max-width: 40rem;
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background: var(--surface);
+    border: 1px solid var(--edge);
+    border-left: 3px solid var(--green);
+    animation: sent-in .32s cubic-bezier(.2,.7,.3,1) both;
+  }
+  .sent:focus { outline: none; }
+  .sent h2 { margin: 0 0 .5rem; font-size: 1.15rem; }
+  .sent p { margin: 0 0 1rem; color: var(--text-muted); }
+  .sent-links { display: flex; gap: .6rem; flex-wrap: wrap; margin: 1.25rem 0 0; }
+
+  @keyframes sent-in {
+    from { opacity: 0; transform: translateY(8px) scale(.985); }
+    to { opacity: 1; transform: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { .sent { animation: none; } }
+</style>

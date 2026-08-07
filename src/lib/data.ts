@@ -137,6 +137,18 @@ export const gymSchema = (l: LocationDoc = location) => ({
 /** The privacy policy. Structure in YAML, no markup — see src/lib/policy.ts. */
 export const privacy: PolicyDoc = parseYaml(readFileSync('data/privacy-policy.yaml', 'utf8'))
 
+/* The waiver. The same file feeds the PDF the Lambda renders — see
+   scripts/generate-waiver.mjs — so the page someone reads and the document
+   they sign cannot drift apart. */
+export type WaiverDoc = {
+  version: string
+  title: string
+  intro?: string
+  sections: { heading: string; body: string }[]
+  acknowledgements: string[]
+}
+export const waiver: WaiverDoc = parseYaml(readFileSync('data/waiver.yaml', 'utf8'))
+
 /** Rendered at build time; the page only ever sees finished HTML. */
 export const privacyHtml: string = renderPolicy(privacy)
 

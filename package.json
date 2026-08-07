@@ -5,14 +5,15 @@
   "private": true,
   "scripts": {
     "dev": "astro dev",
-    "build": "node scripts/generate-catalog.mjs && astro build",
+    "build": "node scripts/generate-catalog.mjs && node scripts/generate-waiver.mjs && astro build",
     "preview": "astro preview",
     "verify-urls": "node scripts/verify-urls.mjs",
     "schedule": "node scripts/print-schedule.ts",
     "verify-holidays": "node scripts/verify-holidays.ts",
     "generate-map": "node scripts/generate-map.mjs",
     "dev:checkout": "node scripts/dev-checkout.mjs",
-    "generate-catalog": "node scripts/generate-catalog.mjs"
+    "generate-catalog": "node scripts/generate-catalog.mjs",
+    "generate-waiver": "node scripts/generate-waiver.mjs"
   },
   "dependencies": {
     "@astrojs/sitemap": "^3.2.1",
@@ -21,6 +22,7 @@
   },
   "devDependencies": {
     "@aws-sdk/client-dynamodb": "^3.1101.0",
+    "@aws-sdk/client-s3": "^3.1105.0",
     "@aws-sdk/client-sesv2": "^3.1104.0"
   }
 }
