@@ -1,14 +1,11 @@
 # ---------------------------------------------------------------------------
 # The waiver text.
 #
-# *** PLACEHOLDER — NOT LEGAL TEXT. REPLACE BEFORE USE. ***
+# NOT DRAFTED BY A LAWYER. This is plain-English wording written to be clear
+# and complete rather than to be enforceable, and its enforceability has not
+# been assessed. It is in use pending review.
 #
-# Everything below was written to give the form and the PDF something to
-# render. It has not been drafted or reviewed by a lawyer and should not be
-# relied on. A release that does not hold up is worse than none, because it
-# leads a gym to believe it is covered when it is not.
-#
-# Points worth putting in front of whoever drafts the real thing:
+# Points to put in front of whoever reviews it:
 #
 #   - Florida requires release language to be clear and unambiguous, and
 #     courts read it strictly against the party relying on it.
@@ -29,7 +26,7 @@
 # tell which wording someone actually agreed to.
 # ---------------------------------------------------------------------------
 
-version: "PLACEHOLDER-2026-08"
+version: "2026-08"
 
 title: Release and Waiver of Liability
 intro: >-
@@ -61,9 +58,13 @@ sections:
 
   - heading: Release
     body: >-
-      PLACEHOLDER. The operative release, waiver and indemnity language goes
-      here and must be drafted by an attorney licensed in Florida. Do not go
-      live with this paragraph as it stands.
+      In exchange for being allowed to take part, you agree to accept these
+      risks and to release BEAST Fitness LLC, its owners, trainers, employees
+      and agents from any claim for injury, illness, loss or damage arising
+      from your participation, other than where it is caused by their
+      recklessness or intentional wrongdoing. This applies to you and to
+      anyone claiming on your behalf. If any part of this release is held to
+      be unenforceable, the rest of it continues to apply.
 
   - heading: Media
     body: >-

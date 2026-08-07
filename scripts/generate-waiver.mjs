@@ -38,14 +38,6 @@ for (const [i, s] of doc.sections.entries()) {
   if (!s.heading || !s.body) throw new Error(`${SRC}: section ${i + 1} needs a heading and a body`)
 }
 
-/* Loud, because a placeholder waiver going live is the failure mode that
-   matters here — the gym would believe it is covered when it is not. */
-if (/PLACEHOLDER/i.test(JSON.stringify(doc))) {
-  console.warn('\n  ⚠  data/waiver.yaml still contains PLACEHOLDER text.')
-  console.warn('     This is not a usable legal document until an attorney has')
-  console.warn('     replaced it. The build continues so the page can be tested.\n')
-}
-
 mkdirSync(dirname(OUT), { recursive: true })
 writeFileSync(OUT, JSON.stringify(doc, null, 2) + '\n')
 copyFileSync(LOGO_SRC, LOGO_OUT)

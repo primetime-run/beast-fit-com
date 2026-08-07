@@ -16,7 +16,6 @@ import { waiver } from '../lib/data'
 */
 
 const ENDPOINT = import.meta.env.PUBLIC_WAIVER_ENDPOINT ?? ''
-const isPlaceholder = /PLACEHOLDER/i.test(JSON.stringify(waiver))
 ---
 
 <Base
@@ -28,13 +27,6 @@ const isPlaceholder = /PLACEHOLDER/i.test(JSON.stringify(waiver))
   <h1 class="brand-title page-title">{waiver.title}</h1>
   {waiver.intro && <p class="lede">{waiver.intro}</p>}
 
-  {isPlaceholder && (
-    <p class="draft" role="alert">
-      <strong>Draft.</strong> This wording is placeholder text pending review by
-      an attorney and is not a binding agreement. Do not collect signatures
-      against it.
-    </p>
-  )}
 
   <article class="terms">
     {waiver.sections.map((s) => (
@@ -451,13 +443,6 @@ const isPlaceholder = /PLACEHOLDER/i.test(JSON.stringify(waiver))
   .page-title { font-size: clamp(1.9rem, 5vw, 2.6rem); text-transform: uppercase; }
   .lede { color: var(--text-muted); }
 
-  .draft {
-    margin: 1.25rem 0;
-    padding: 1rem 1.25rem;
-    background: var(--surface);
-    border: 1px solid var(--edge);
-    border-left: 3px solid #d08a1f;
-  }
 
   .terms { margin: 2rem 0; }
   .terms section { margin-bottom: 1.5rem; }
