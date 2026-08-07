@@ -91,6 +91,29 @@ function ageOn(dob, when = new Date()) {
 
 /* --- the document -------------------------------------------------------- */
 
+/* The standard PDF fonts are WinAnsi — Latin-1 and nothing else. Handing
+   pdf-lib a character outside that range throws, and an unhandled throw here
+   means somebody with a Chinese or Arabic name cannot sign the waiver at all.
+   That is a hard block on a legal document, so it has to degrade instead.
+   
+   Accented Latin survives: é, ü, ñ and the rest are all inside WinAnsi, so
+   José and Renée render exactly as typed. Only genuinely outside-Latin-1
+   characters are substituted, and when that happens the PDF says so rather
+   than quietly showing a name nobody would recognise. The exact string is
+   still recorded in the notification email and the object metadata.
+   
+   Embedding a font with full Unicode coverage would be the complete fix. A
+   CJK-capable one is ~16MB in the deploy zip, which is a poor trade for a
+   Delray Beach gym — revisit if it ever actually comes up. */
+const WIN_ANSI_SAFE = /[^\u0000-\u00ff\u20ac\u201a\u0192\u201e\u2026\u2020\u2021\u02c6\u2030\u0160\u2039\u0152\u017d\u2018\u2019\u201c\u201d\u2022\u2013\u2014\u02dc\u2122\u0161\u203a\u0153\u017e\u0178]/g
+
+let substituted = false
+const safe = (str) => {
+  const out = String(str).replace(WIN_ANSI_SAFE, '?')
+  if (out !== String(str)) substituted = true
+  return out
+}
+
 const PAGE = { w: 612, h: 792 } // US Letter, in points
 const M = 54 // margin
 
@@ -116,6 +139,7 @@ function wrap(text, font, size, maxWidth) {
 }
 
 async function buildPdf(record) {
+  substituted = false
   const doc = await PDFDocument.create()
   doc.setTitle(`${waiver.title} — ${record.participantName}`)
   doc.setSubject(`Signed ${record.signedAt}`)
@@ -140,7 +164,7 @@ async function buildPdf(record) {
   const text = (str, { font = body, size = 10, gap = 4, color = rgb(0.1, 0.1, 0.1) } = {}) => {
     for (const line of wrap(str, font, size, width)) {
       room(size + gap)
-      page.drawText(line, { x: M, y: y - size, size, font, color })
+      page.drawText(safe(line), { x: M, y: y - size, size, font, color })
       y -= size + gap
     }
   }
@@ -195,7 +219,7 @@ async function buildPdf(record) {
     })
     page.drawText('X', { x: M + 1.8, y: y - 8, size: 8, font: bold, color: rgb(0.1, 0.1, 0.1) })
     for (const [i, line] of wrap(a, body, 9.5, width - 18).entries()) {
-      page.drawText(line, { x: M + 18, y: y - 8 - i * 12, size: 9.5, font: body })
+      page.drawText(safe(line), { x: M + 18, y: y - 8 - i * 12, size: 9.5, font: body })
       if (i > 0) y -= 12
     }
     y -= 16
@@ -206,7 +230,7 @@ async function buildPdf(record) {
   const field = (label, value) => {
     room(16)
     page.drawText(`${label}:`, { x: M, y: y - 9, size: 9, font: bold, color: rgb(0.35, 0.35, 0.35) })
-    page.drawText(String(value), { x: M + 120, y: y - 9, size: 9.5, font: body })
+    page.drawText(safe(String(value)), { x: M + 120, y: y - 9, size: 9.5, font: body })
     y -= 15
   }
 
@@ -245,8 +269,25 @@ async function buildPdf(record) {
   ]
   for (const line of meta) {
     room(11)
-    page.drawText(line, { x: M, y: y - 7, size: 7.5, font: body, color: rgb(0.45, 0.45, 0.45) })
+    page.drawText(safe(line), { x: M, y: y - 7, size: 7.5, font: body, color: rgb(0.45, 0.45, 0.45) })
     y -= 11
+  }
+
+  /* Said out loud rather than left to be noticed. A waiver showing "?? Chen"
+     with no explanation looks like corruption; with this line it is a known
+     rendering limit and the real spelling is in the email. */
+  if (substituted) {
+    room(22)
+    y -= 6
+    page.drawText(
+      'Some characters in the submitted details cannot be shown in this document.',
+      { x: M, y: y - 7, size: 7.5, font: body, color: rgb(0.55, 0.3, 0.1) }
+    )
+    y -= 10
+    page.drawText(
+      'The exact spelling as entered is recorded in the notification email for this reference.',
+      { x: M, y: y - 7, size: 7.5, font: body, color: rgb(0.55, 0.3, 0.1) }
+    )
   }
 
   return Buffer.from(await doc.save())
@@ -370,7 +411,20 @@ export const handler = async (event) => {
     return reply(500, { error: 'pdf_failed' }, allowed)
   }
 
-  const safeName = participantName.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase()
+  /* Fold accents before stripping, rather than deleting them.
+     A plain [^a-zA-Z0-9] filter turns "José Álvarez" into "jos-lvarez" — it
+     removes the accented letters outright instead of transliterating them.
+     Normalising to NFD first splits each letter from its diacritic, so the
+     base letter survives and only the mark is dropped: "jose-alvarez".
+     This is somebody's name on a legal document; mangling it is not a
+     cosmetic problem. */
+  const safeName =
+    participantName
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .toLowerCase() || 'unnamed'
   const filename = `waiver-${safeName}-${signedAt.slice(0, 10)}.pdf`
   const key = `waivers/${signedAt.slice(0, 4)}/${signedAt.slice(5, 7)}/${signedAt.slice(0, 10)}-${safeName}-${id}.pdf`
 
