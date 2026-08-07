@@ -37,6 +37,8 @@ const {
   ARCHIVE_BUCKET,
   SIGNER_COPY = 'off',
   ALLOWED_ORIGINS = '',
+  CHALLENGE_SECRET = '',
+  POW_BITS = '18',
 } = process.env
 
 const origins = ALLOWED_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean)
@@ -75,6 +77,65 @@ const clean = (v, max) =>
     .replace(/[\r\n]+/g, ' ')
     .trim()
     .slice(0, max)
+
+/* --- proof of work ------------------------------------------------------
+   A form this quiet is not worth a bot's time unless posting is free, so the
+   point is to make it cost something. Two gates, and they work together:
+
+   1. A challenge must be FETCHED. It is HMAC-signed, bound to the caller's
+      IP, and expires in two minutes — so a script that POSTs straight at the
+      endpoint, which is what nearly all of them do, is refused outright. It
+      cannot be forged without the secret and it cannot be lifted from
+      somebody else's session.
+
+   2. That challenge must be SOLVED. The client hunts for a nonce whose
+      SHA-256 starts with a run of zero bits. A person waits a moment; a bot
+      pays that same moment for every single attempt, which is what turns
+      bulk submission from free into expensive.
+
+   Neither is a CAPTCHA and neither asks anything of the person filling the
+   form. Turnstile could sit on top of this if it is ever wanted, but it adds
+   a third-party request to a site that currently makes none.
+------------------------------------------------------------------------- */
+
+const powBits = Math.max(1, Math.min(28, Number(POW_BITS) || 18))
+const CHALLENGE_TTL_MS = 120_000
+
+const sign = (payload) =>
+  createHmac('sha256', CHALLENGE_SECRET).update(payload).digest('hex').slice(0, 32)
+
+function issueChallenge(ip) {
+  const nonce = randomUUID()
+  const exp = Date.now() + CHALLENGE_TTL_MS
+  return { challenge: nonce, exp, bits: powBits, sig: sign(`${nonce}|${exp}|${ip}`) }
+}
+
+/** Leading zero BITS, not characters — bits give fine-grained difficulty. */
+function meetsDifficulty(hashHex, bits) {
+  let remaining = bits
+  for (const ch of hashHex) {
+    const nibble = parseInt(ch, 16)
+    if (remaining >= 4) {
+      if (nibble !== 0) return false
+      remaining -= 4
+    } else {
+      return nibble >> (4 - remaining) === 0
+    }
+    if (remaining === 0) return true
+  }
+  return remaining === 0
+}
+
+function challengeValid({ challenge, exp, sig, solution }, ip) {
+  if (!CHALLENGE_SECRET) return true // not configured; the other checks still apply
+  if (!challenge || !exp || !sig || solution === undefined) return false
+  if (Number(exp) < Date.now()) return false
+  // Constant-time is unnecessary here: a forged signature reveals nothing
+  // useful by timing, since the challenge is single-use and short-lived.
+  if (sign(`${challenge}|${exp}|${ip}`) !== sig) return false
+  const hash = createHash('sha256').update(`${challenge}:${solution}`).digest('hex')
+  return meetsDifficulty(hash, powBits)
+}
 
 const EMAIL_RE = /^[^@\s]+@[^@\s.]+\.[^@\s]{2,}$/
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
@@ -345,6 +406,17 @@ export const handler = async (event) => {
     body = JSON.parse(event.body ?? '{}')
   } catch {
     return reply(400, { error: 'bad_json' }, allowed)
+  }
+
+  /* Handing out a challenge is cheap and stateless, so it sits behind the
+     origin check and the rate limit but nothing else. */
+  if (body.action === 'challenge') {
+    return reply(200, issueChallenge(ip), allowed)
+  }
+
+  if (!challengeValid(body, ip)) {
+    // Deliberately vague: naming which half failed tells a bot what to fix.
+    return reply(403, { error: 'challenge_failed' }, allowed)
   }
 
   // Honeypot and timing, answered 200 so a bot learns nothing.

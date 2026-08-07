@@ -140,8 +140,11 @@ const isPlaceholder = /PLACEHOLDER/i.test(JSON.stringify(waiver))
     <h2>Waiver signed.</h2>
     <p>A copy has been sent to the gym. Your reference is <strong data-ref></strong>.</p>
     <p class="sent-links">
-      <a class="btn" href="/schedule/">See the schedule</a>
-      <a class="btn ghost" href="/training/">Training options</a>
+      {/* Sign another, because these are signed in groups — a parent doing one
+          per child, or a trainer working through a class on one device. Making
+          them reload the page to do it again is a small cruelty. */}
+      <button type="button" class="btn" data-again>Sign another</button>
+      <a class="btn ghost" href="/schedule/">See the schedule</a>
     </p>
   </div>
 </Base>
@@ -153,6 +156,7 @@ const isPlaceholder = /PLACEHOLDER/i.test(JSON.stringify(waiver))
   const guardian = document.querySelector('[data-guardian]')
   const dob = document.querySelector('[data-dob]')
   const acks = [...document.querySelectorAll('[data-ack]')]
+  const again = document.querySelector('[data-again]')
 
   let renderedAt = Date.now()
 
@@ -183,35 +187,225 @@ const isPlaceholder = /PLACEHOLDER/i.test(JSON.stringify(waiver))
   dob.addEventListener('change', syncGuardian)
   dob.addEventListener('input', syncGuardian)
 
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault()
-    const data = Object.fromEntries(new FormData(form).entries())
+  again?.addEventListener('click', () => {
+    form.reset()
+    for (const a of acks) a.checked = false
+    syncGuardian()
+    say('')
 
-    const required = ['participantName', 'dob', 'email', 'emergencyName', 'emergencyPhone', 'signature']
-    if (required.some((k) => !String(data[k] ?? '').trim())) {
-      return say('Please fill in every required field.', 'err')
+    sent.hidden = true
+    form.hidden = false
+
+    /* Re-stamp, or the server's minimum-fill-time check measures the second
+       waiver from the original page load and waves it through however fast it
+       was posted. */
+    renderedAt = Date.now()
+
+    form.querySelector('input')?.focus()
+  })
+
+  /* --- validation -------------------------------------------------------
+     Checked field by field rather than as one pass/fail, so the message says
+     which field and sits next to it. A single "please fill in the required
+     fields" on a form this long makes someone hunt.
+
+     aria-invalid and aria-describedby, not just red text: without them the
+     error is visible only to people who can see it, on a form that legally
+     binds whoever submits it. */
+  const errorFor = (input) => {
+    let el = input.parentElement.querySelector('.field-error')
+    if (!el) {
+      el = document.createElement('span')
+      el.className = 'field-error'
+      el.id = `err-${input.name || Math.random().toString(36).slice(2)}`
+      input.parentElement.appendChild(el)
     }
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(data.email))) {
-      return say('That email address does not look right.', 'err')
+    return el
+  }
+
+  const markInvalid = (input, message) => {
+    const el = errorFor(input)
+    el.textContent = message
+    input.setAttribute('aria-invalid', 'true')
+    input.setAttribute('aria-describedby', el.id)
+  }
+
+  const clearInvalid = (input) => {
+    const el = input.parentElement.querySelector('.field-error')
+    if (el) el.textContent = ''
+    input.removeAttribute('aria-invalid')
+    input.removeAttribute('aria-describedby')
+  }
+
+  // Clear as they fix it, rather than leaving a stale error under a good value.
+  for (const input of form.querySelectorAll('input')) {
+    input.addEventListener('input', () => clearInvalid(input))
+  }
+
+  const RULES = [
+    ['participantName', (v) => (v.trim() ? '' : 'Enter the full name.')],
+    ['dob', (v) => {
+      if (!v) return 'Enter a date of birth.'
+      const age = ageFrom(v)
+      if (age === null) return 'That date does not look right.'
+      if (age < 0) return 'That date is in the future.'
+      if (age > 120) return 'That date does not look right.'
+      return ''
+    }],
+    ['email', (v) => (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.trim()) ? '' : 'Enter a valid email address.')],
+    ['emergencyName', (v) => (v.trim() ? '' : 'Enter an emergency contact.')],
+    ['emergencyPhone', (v) => (v.trim() ? '' : 'Enter their phone number.')],
+    ['signature', (v) => (v.trim() ? '' : 'Type your full name to sign.')],
+  ]
+
+  const GUARDIAN_RULES = [
+    ['guardianName', 'Enter the guardian\u2019s full name.'],
+    ['guardianRelationship', 'Enter the relationship to the participant.'],
+    ['guardianSignature', 'The guardian must type their full name to sign.'],
+  ]
+
+  /** Returns the first invalid element, or null. Marks every problem, so the
+   *  form is fixed in one pass instead of one field at a time. */
+  const validate = () => {
+    let first = null
+    const fail = (input, msg) => {
+      markInvalid(input, msg)
+      first = first || input
     }
-    if (!acks.every((a) => a.checked)) {
-      return say('Please tick every acknowledgement — each one is recorded separately.', 'err')
+
+    for (const [name, rule] of RULES) {
+      const input = form.elements[name]
+      const msg = rule(String(input.value ?? ''))
+      if (msg) fail(input, msg)
+      else clearInvalid(input)
     }
+
     if (!guardian.hidden) {
-      const g = ['guardianName', 'guardianRelationship', 'guardianSignature']
-      if (g.some((k) => !String(data[k] ?? '').trim())) {
-        return say('A parent or guardian must complete their section.', 'err')
+      for (const [name, msg] of GUARDIAN_RULES) {
+        const input = form.elements[name]
+        if (!String(input.value ?? '').trim()) fail(input, msg)
+        else clearInvalid(input)
       }
     }
+
+    const missed = acks.filter((a) => !a.checked)
+    if (missed.length) {
+      markInvalid(missed[0], 'Tick every box to continue \u2014 each is recorded separately.')
+      first = first || missed[0]
+    } else {
+      for (const a of acks) clearInvalid(a)
+    }
+
+    return first
+  }
+
+  /* --- proof of work ------------------------------------------------------
+     A challenge is fetched, then solved, before anything is submitted. A bot
+     posting straight at the endpoint has neither and is refused.
+
+     SHA-256 is implemented here rather than using crypto.subtle because that
+     API is asynchronous: awaiting it a hundred thousand times would take
+     seconds, where a synchronous loop finishes in well under one. */
+  function sha256(ascii) {
+    const K = sha256.K || (sha256.K = (() => {
+      const k = [], isPrime = (n) => { for (let i = 2; i * i <= n; i++) if (n % i === 0) return false; return true }
+      for (let n = 2, i = 0; i < 64; n++) if (isPrime(n)) { k[i++] = (Math.pow(n, 1 / 3) % 1 * 2 ** 32) | 0 }
+      return k
+    })())
+    let h = sha256.H ? sha256.H.slice() : (sha256.H = (() => {
+      const hh = [], isPrime = (n) => { for (let i = 2; i * i <= n; i++) if (n % i === 0) return false; return true }
+      for (let n = 2, i = 0; i < 8; n++) if (isPrime(n)) { hh[i++] = (Math.sqrt(n) % 1 * 2 ** 32) | 0 }
+      return hh
+    })()).slice()
+
+    const bytes = new TextEncoder().encode(ascii)
+    const len = bytes.length * 8
+    const withPad = new Uint8Array((((bytes.length + 8) >> 6) + 1) << 6)
+    withPad.set(bytes)
+    withPad[bytes.length] = 0x80
+    new DataView(withPad.buffer).setUint32(withPad.length - 4, len, false)
+
+    const w = new Int32Array(64)
+    const view = new DataView(withPad.buffer)
+    for (let off = 0; off < withPad.length; off += 64) {
+      for (let i = 0; i < 16; i++) w[i] = view.getInt32(off + i * 4, false)
+      for (let i = 16; i < 64; i++) {
+        const a = w[i - 15], b = w[i - 2]
+        const s0 = ((a >>> 7) | (a << 25)) ^ ((a >>> 18) | (a << 14)) ^ (a >>> 3)
+        const s1 = ((b >>> 17) | (b << 15)) ^ ((b >>> 19) | (b << 13)) ^ (b >>> 10)
+        w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0
+      }
+      let [a, b, c, d, e, f, g, hh] = h
+      for (let i = 0; i < 64; i++) {
+        const S1 = ((e >>> 6) | (e << 26)) ^ ((e >>> 11) | (e << 21)) ^ ((e >>> 25) | (e << 7))
+        const ch = (e & f) ^ (~e & g)
+        const t1 = (hh + S1 + ch + K[i] + w[i]) | 0
+        const S0 = ((a >>> 2) | (a << 30)) ^ ((a >>> 13) | (a << 19)) ^ ((a >>> 22) | (a << 10))
+        const maj = (a & b) ^ (a & c) ^ (b & c)
+        const t2 = (S0 + maj) | 0
+        hh = g; g = f; f = e; e = (d + t1) | 0
+        d = c; c = b; b = a; a = (t1 + t2) | 0
+      }
+      h = [h[0] + a | 0, h[1] + b | 0, h[2] + c | 0, h[3] + d | 0,
+           h[4] + e | 0, h[5] + f | 0, h[6] + g | 0, h[7] + hh | 0]
+    }
+    return h.map((x) => (x >>> 0).toString(16).padStart(8, '0')).join('')
+  }
+
+  const meetsDifficulty = (hex, bits) => {
+    let remaining = bits
+    for (const ch of hex) {
+      const nibble = parseInt(ch, 16)
+      if (remaining >= 4) {
+        if (nibble !== 0) return false
+        remaining -= 4
+      } else {
+        return nibble >> (4 - remaining) === 0
+      }
+      if (remaining === 0) return true
+    }
+    return remaining === 0
+  }
+
+  const solve = (challenge, bits) => {
+    for (let n = 0; n < 50_000_000; n++) {
+      if (meetsDifficulty(sha256(`${challenge}:${n}`), bits)) return n
+    }
+    throw new Error('unsolved')
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    say('')
+
+    const firstBad = validate()
+    if (firstBad) {
+      firstBad.focus()
+      firstBad.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      return say('Some details need fixing \u2014 see the notes below each field.', 'err')
+    }
+
     if (!ENDPOINT) {
       return say('This form is not connected yet. Please contact us to sign in person.', 'err')
     }
 
     const btn = form.querySelector('button[type="submit"]')
     btn.disabled = true
-    say('Submitting…')
+    say('Checking\u2026')
 
     try {
+      const chRes = await fetch(ENDPOINT, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'challenge' }),
+      })
+      const ch = await chRes.json()
+      if (!chRes.ok || !ch.challenge) throw new Error('challenge')
+
+      say('Submitting\u2026')
+      const solution = solve(ch.challenge, ch.bits)
+
+      const data = Object.fromEntries(new FormData(form).entries())
       const res = await fetch(ENDPOINT, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -219,13 +413,17 @@ const isPlaceholder = /PLACEHOLDER/i.test(JSON.stringify(waiver))
           ...data,
           acknowledgements: acks.map((a) => a.checked),
           renderedAt,
+          challenge: ch.challenge,
+          exp: ch.exp,
+          sig: ch.sig,
+          solution,
         }),
       })
       const out = await res.json().catch(() => ({}))
 
       if (res.ok) {
         say('')
-        document.querySelector('[data-ref]').textContent = out.reference ?? '—'
+        document.querySelector('[data-ref]').textContent = out.reference ?? '\u2014'
         form.hidden = true
         sent.hidden = false
         sent.focus()
@@ -236,6 +434,7 @@ const isPlaceholder = /PLACEHOLDER/i.test(JSON.stringify(waiver))
           dob_invalid: 'That date of birth does not look right.',
           email_invalid: 'That email address does not look right.',
           rate_limited: 'Too many attempts. Please wait a minute and try again.',
+          challenge_failed: 'That took too long, or the page has been open a while. Please try again.',
           archive_failed: 'We could not store your waiver, so it has not been accepted. Please try again, or contact us.',
         }
         say(MESSAGES[out.error] ?? 'Something went wrong. Please try again, or contact us.', 'err')
@@ -313,6 +512,17 @@ const isPlaceholder = /PLACEHOLDER/i.test(JSON.stringify(waiver))
   .actions { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
   .status { margin: 0; font-size: .9rem; }
   .status.err { color: var(--danger); }
+
+  .field-error {
+    display: block;
+    margin-top: .3rem;
+    font-size: .82rem;
+    font-weight: 400;
+    color: var(--danger);
+  }
+  .field-error:empty { display: none; }
+  input[aria-invalid='true'] { border-color: var(--danger); }
+  .ack input[aria-invalid='true'] { outline: 2px solid var(--danger); outline-offset: 2px; }
 
   .sent {
     max-width: 40rem;

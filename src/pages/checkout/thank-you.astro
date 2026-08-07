@@ -32,8 +32,23 @@ import Base from '../../layouts/Base.astro'
     do not pay again.
   </p>
 
+  {/* The next thing they actually have to do, in its own block rather than a
+      third button in the row below. Nobody reaches a payment confirmation
+      looking for paperwork, so it has to say why it matters — otherwise it
+      reads as optional and gets skipped until they turn up to train and
+      cannot start. */}
+  <section class="next">
+    <h2 class="brand-title sub">One more thing — sign the waiver</h2>
+    <p>
+      Everyone training with us signs a waiver before their first session. It
+      takes a minute, and doing it now means you can start straight away.
+    </p>
+    <p class="next-note">Under 18? A parent or guardian completes it with you.</p>
+    <a class="btn" href="/waiver/">Sign the waiver</a>
+  </section>
+
   <p class="actions">
-    <a class="btn" href="/schedule/">See the schedule</a>
+    <a class="btn ghost" href="/schedule/">See the schedule</a>
     <a class="btn ghost" href="/training/">Back to training</a>
   </p>
 </Base>
@@ -42,4 +57,15 @@ import Base from '../../layouts/Base.astro'
   .page-title { font-size: clamp(1.9rem, 5vw, 2.6rem); text-transform: uppercase; }
   .lead { font-size: 1.05rem; }
   .actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 2rem; }
+
+  .next {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background: var(--surface);
+    border: 1px solid var(--edge);
+    border-left: 3px solid var(--green);
+  }
+  .next .sub { font-size: 1rem; text-transform: uppercase; margin: 0 0 .6rem; }
+  .next p { margin: 0 0 .75rem; }
+  .next-note { font-size: .85rem; color: var(--text-muted); }
 </style>

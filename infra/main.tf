@@ -3,6 +3,7 @@ terraform {
   required_providers {
     aws     = { source = "hashicorp/aws", version = ">= 5.40" }
     archive = { source = "hashicorp/archive", version = ">= 2.4" }
+    random  = { source = "hashicorp/random", version = ">= 3.6" }
   }
 }
 
@@ -516,6 +517,15 @@ resource "aws_iam_role_policy" "waiver" {
   policy = data.aws_iam_policy_document.waiver.json
 }
 
+# Generated once and kept in state rather than asked for as a variable. Nobody
+# needs to know this value — it only has to be stable, secret, and identical
+# across invocations. Rotating it invalidates challenges issued in the previous
+# two minutes, which is not worth thinking about.
+resource "random_password" "challenge_secret" {
+  length  = 48
+  special = false
+}
+
 resource "aws_lambda_function" "waiver" {
   function_name    = "beast-fit-waiver"
   role             = aws_iam_role.waiver.arn
@@ -539,6 +549,15 @@ resource "aws_lambda_function" "waiver" {
       # is not verified, and the sandbox refuses it.
       SIGNER_COPY  = var.waiver_signer_copy ? "on" : "off"
       NODE_OPTIONS = "--enable-source-maps"
+
+      # Without this the challenge check passes unconditionally — the handler
+      # treats an unset secret as "not configured" so a half-finished deploy
+      # cannot lock everyone out. It has to be set for the gate to exist.
+      CHALLENGE_SECRET = random_password.challenge_secret.result
+
+      # ~65,000 hashes: about 70ms in a browser, and the same again for every
+      # attempt a bot makes. Each extra bit doubles the cost to both sides.
+      POW_BITS = "16"
     }
   }
 }
