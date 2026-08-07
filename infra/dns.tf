@@ -49,6 +49,9 @@ locals {
 resource "aws_route53_record" "legacy_apex" {
   count = var.manage_dns && !var.point_dns_at_pages ? 1 : 0
 
+  # Needed in the rollback direction for the same reason.
+  allow_overwrite = true
+
   zone_id = local.zone_id
   name    = var.domain
   type    = "A"
@@ -58,6 +61,8 @@ resource "aws_route53_record" "legacy_apex" {
 
 resource "aws_route53_record" "legacy_www" {
   count = var.manage_dns && !var.point_dns_at_pages ? 1 : 0
+
+  allow_overwrite = true
 
   zone_id = local.zone_id
   name    = "www.${var.domain}"
@@ -125,6 +130,15 @@ resource "aws_route53_record" "dmarc" {
 resource "aws_route53_record" "apex" {
   count = var.manage_dns && var.point_dns_at_pages ? 1 : 0
 
+  # allow_overwrite, because these replace records at the same name.
+  #
+  # Flipping the flag destroys legacy_apex/legacy_www and creates these. Route
+  # 53 is not transactional across that pair, so the create can land while the
+  # old record is still present and fail with "already exists" — leaving the
+  # zone with the old records deleted and the new ones never made, which is a
+  # domain that resolves to nothing. UPSERT instead of CREATE removes the race.
+  allow_overwrite = true
+
   zone_id = local.zone_id
   name    = var.domain
   type    = "A"
@@ -142,6 +156,9 @@ resource "aws_route53_record" "apex" {
 
 resource "aws_route53_record" "www" {
   count = var.manage_dns && var.point_dns_at_pages ? 1 : 0
+
+  # Same reason as the apex above.
+  allow_overwrite = true
 
   zone_id = local.zone_id
   name    = "www.${var.domain}"

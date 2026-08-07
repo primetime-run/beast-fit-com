@@ -150,6 +150,24 @@ const jsonLd = {
 
   .layout { display: grid; gap: 2rem; margin-top: 1.5rem; align-items: start; }
 
+  /* min-width:0 on both columns.
+   *
+   * A grid item defaults to min-width:auto, which means it will not shrink
+   * below its content's minimum — and the options table sets that floor with
+   * nowrap on the price and button cells. Below about 340px the columns then
+   * push wider than the screen and take the whole page with them.
+   *
+   * This is the fix for the item; the table still needs somewhere to put the
+   * overflow, which is the scroll container below. */
+  .col-about,
+  .col-options { min-width: 0; }
+
+  /* The table scrolls inside its own column rather than the page scrolling
+     sideways. A price and a Buy button cannot wrap sensibly, so on a narrow
+     phone something has to give — better a table that scrolls than a whole
+     page that does, where the header and prose drift off-screen too. */
+  .col-options { overflow-x: auto; }
+
   /* The prose column is capped so lines stay readable; the options column
      takes the rest. Sticky on tall screens so the price list stays in view
      while you read. */
