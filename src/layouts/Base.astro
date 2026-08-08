@@ -157,7 +157,10 @@ const isCurrent = (href: string) =>
       function setOpen(open: boolean) {
         burger?.setAttribute('aria-expanded', String(open))
         navEl?.classList.toggle('is-open', open)
-        document.body.classList.toggle('nav-open', open)
+        /* On <html>, not <body>. The scroll lock has to live on the root now
+           that the root sets overflow-x: clip — see the rule in the stylesheet
+           below for why putting it on body breaks the sticky masthead. */
+        document.documentElement.classList.toggle('nav-open', open)
       }
 
       burger?.addEventListener('click', () =>
@@ -345,12 +348,26 @@ const isCurrent = (href: string) =>
         .nav.is-open a { animation: none; }
       }
 
-      :global(body.nav-open) {
+      /* The scroll lock, and it must be on <html> rather than <body>.
+
+         The root element's overflow propagates to the viewport. While <html>
+         was `visible`, a lock on <body> propagated up and clipped the viewport
+         — body never became a scroll container and the sticky header above was
+         unaffected. Once <html> took `overflow-x: clip` for the phone pan fix
+         it stopped being visible, that propagation ended, and body's own
+         `overflow: hidden` made BODY the scroll container. The masthead's
+         scrollport moved with it, so opening the menu dropped the header to
+         its static position — measured at y=0 → y=-502 on a 390px screen, with
+         the menu itself off the top of the page.
+
+         Locking the root instead keeps one scroll container and one scrollport
+         for sticky to work against. */
+      :global(html.nav-open) {
         overflow: hidden;
       }
 
       @media (min-width: 48.01rem) {
-        :global(body.nav-open) {
+        :global(html.nav-open) {
           overflow: auto;
         }
       }

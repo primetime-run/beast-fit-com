@@ -473,7 +473,12 @@ const ENDPOINT = import.meta.env.PUBLIC_WAIVER_ENDPOINT ?? ''
   .lede { color: var(--text-muted); }
 
 
-  .terms { margin: 2rem 0; }
+  /* A step down from body copy. This is six paragraphs of dense legal prose
+     that nobody reads at reading size — smaller makes the whole agreement
+     visible in fewer screens, which in practice means more of it gets looked
+     at, not less. The line-height stays at the body's 1.6 so the measure does
+     not tighten with the type. */
+  .terms { margin: 2rem 0; font-size: .9rem; }
   .terms p { margin: 0 0 1.1rem; color: var(--text-muted); }
 
   .fill {
@@ -507,6 +512,21 @@ const ENDPOINT = import.meta.env.PUBLIC_WAIVER_ENDPOINT ?? ''
     border: 1px solid var(--edge); border-radius: 4px;
   }
   input:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
+
+  /* Safari on iOS gives input[type=date] an intrinsic content-based width and
+     ignores width:100%, so the field comes up short and leaves a gap down the
+     right of the form while every other input fills it. Dropping the native
+     appearance makes it size like the rest.
+
+     Not reproducible in headless Chromium, which honours the width — this is
+     fixed against the documented WebKit behaviour, so it wants checking on a
+     real iPhone rather than trusting the local sweep. */
+  input[type='date'] {
+    -webkit-appearance: none;
+    appearance: none;
+    min-width: 0;
+    max-width: 100%;
+  }
 
   .guardian {
     margin: 0 0 1rem;

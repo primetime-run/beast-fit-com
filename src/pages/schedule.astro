@@ -229,8 +229,14 @@ const jsonLd = {
               stacked and this is the only thing telling them apart. */}
           <h2 class="month-heading">{mv.label}</h2>
           <div class="grid">
+            {/* Both spellings ship; CSS picks one. Sunday collapses to a
+                single letter on phones because the column carries no classes
+                and only needs to hold a date — see the grid rules. */}
             {MONTH_DOW.map((d) => (
-              <div class="dow">{d}</div>
+              <div class="dow">
+                <span class="dow-full">{d}</span>
+                <span class="dow-abbr" aria-hidden="true">{d.charAt(0)}</span>
+              </div>
             ))}
             {mv.weeks.flat().map((date) => {
               if (!date) return <div class="cell empty" />
@@ -486,13 +492,28 @@ const jsonLd = {
   .cell.empty { background: var(--surface-2); min-height: 0; }
   .cell.is-closed { background: var(--cell-closed); }
   .cell.is-special { background: var(--cell-special); }
-  .num { font-variant-numeric: tabular-nums; font-weight: 700; }
+  /* nowrap for the same reason as .chip, and it is load-bearing for the narrow
+     Sunday column: `overflow-wrap: anywhere` on the cell drops min-content to a
+     single character, so a min-content track sized itself to one digit and
+     broke "16" across two lines. With this, the column sizes to two digits —
+     marginally wider than the "S" alone, and the narrowest it can honestly be
+     while still showing a date. */
+  .num { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
   .holi { font-size: .65rem; color: var(--link); line-height: 1.15; }
   .closedtag { font-size: .7rem; color: var(--danger); font-weight: 700; }
+  /* nowrap because "5:30a" is one reading, not two. The cell allows breaking
+     anywhere so that a long class name can never widen a column, but that
+     licence applied to a time split the meridiem onto its own line. The times
+     are the densest thing in the grid, so they get the exception and the
+     column is made wide enough to hold them by narrowing Sunday below. */
   .chip {
     font-size: .72rem; color: var(--link); font-variant-numeric: tabular-nums;
     text-decoration: none; border-radius: 2px; padding: 0 .15rem;
+    white-space: nowrap;
   }
+
+  /* Full name by default; the single letter only appears where asked for. */
+  .dow-abbr { display: none; }
   .chip:hover, .chip:focus-visible { background: var(--green); color: #0a0a0a; }
   .chip.special { color: var(--green-dark); font-weight: 700; }
   @media (prefers-color-scheme: dark) {
@@ -543,15 +564,39 @@ const jsonLd = {
        every date onto the wrong weekday.
 
        The grid's children are the seven day headings followed by the cells,
-       so nth-child(7n+1) is the Sunday column in both. */
-    .grid { grid-template-columns: 2rem repeat(6, minmax(0, 1fr)); }
+       so nth-child(7n+1) is the Sunday column in both.
+
+       min-content rather than a fixed 2rem: the column then takes exactly what
+       its widest occupant needs — the letter "S" or a two-digit date, whichever
+       is wider — instead of a guessed width that was 32px whatever was in it.
+       The ~12px that frees goes to the other six columns via their 1fr, which
+       is what lets the times sit on one line without wrapping. */
+    .grid { grid-template-columns: min-content repeat(6, minmax(0, 1fr)); }
 
     .grid > :nth-child(7n + 1) {
       padding-inline: .15rem;
     }
 
+    /* "Sun" becomes "S" — visually. The full word is hidden but kept in the
+       accessibility tree rather than display:none'd, because the letter beside
+       it is aria-hidden: remove both from the tree and this heading would
+       announce as nothing at all. So a screen reader still hears "Sun" while
+       the eye gets "S".
+
+       Taking it out of flow also keeps it out of the column's min-content, so
+       the track sizes to the letter and the date, which is the point. */
+    .dow:nth-child(7n + 1) .dow-full {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    .dow:nth-child(7n + 1) .dow-abbr { display: inline; }
+
     .dow:nth-child(7n + 1) {
-      font-size: .55rem;
+      font-size: .7rem;
       letter-spacing: -0.02em;
     }
 
@@ -609,6 +654,14 @@ const jsonLd = {
        the label absorbs whatever is left, so the arrows stay pinned to the
        edges no matter how long the month is, and nothing can overflow. */
     .monthnav strong { min-width: 0; flex: 1; }
+  }
+
+  /* Folded phones. Keeping times on one line costs width, and below about
+     300px the six class columns no longer have it — the chips ran 3-4px past
+     their cells. Shrink the chip rather than let the time wrap again, since
+     unwrapped is the whole point of the nowrap above. */
+  @media (max-width: 19rem) {
+    .chip { font-size: .64rem; padding: 0 .05rem; }
   }
 
   /* --- desktop week: seven columns ---------------------------------------
