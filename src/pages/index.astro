@@ -303,7 +303,10 @@ const jsonLd = {
     border-left: 3px solid var(--edge);
   }
 
-  .n-when { display: flex; flex-direction: column; line-height: 1.15; }
+  /* min-width:0 because this is a flex container inside a grid track: without
+     it the column refuses to go below the width of "6:30am", which in Black
+     Ops One at 1.05rem is wider than a 280px phone leaves for it. */
+  .n-when { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
   .n-time {
     font-family: var(--brand);
     font-size: 1.05rem;
@@ -369,18 +372,31 @@ const jsonLd = {
   .next-empty { color: var(--text-muted); margin: 0; }
 
   @media (max-width: 34rem) {
-    .next-row { grid-template-columns: 1fr auto; row-gap: .35rem; padding: .7rem .8rem; }
+    .next-row { grid-template-columns: minmax(0, 1fr) auto; row-gap: .35rem; padding: .7rem .8rem; }
     .n-when { grid-column: 1; }
     .n-name { grid-column: 1 / -1; order: 3; }
     /* Add stays visible here — it is now the only way into the dialog. */
     .n-add { grid-column: 2; justify-self: end; }
   }
 
+  /* Folded phones and the like. "6:30am" is a single token that cannot wrap,
+     so the only ways to fit it are a smaller face or breaking mid-time — and
+     breaking a time across two lines makes it unreadable. Shrink instead. */
+  @media (max-width: 22rem) {
+    .n-time { font-size: .82rem; }
+    .n-day { font-size: .7rem; }
+  }
+
   /* --- training options --- */
   .options {
     list-style: none; margin: 0; padding: 0;
     display: grid; gap: 1rem;
-    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    /* min(14rem, 100%) rather than a bare 14rem. A 14rem floor is 224px, and
+       on a 280px-wide phone the panel only offers about 208px — so the track
+       stayed 224px and pushed past the edge. The min() lets the floor collapse
+       to the container on anything narrower than itself, and changes nothing
+       at any width where 14rem actually fits. */
+    grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
   }
   .option {
     background: var(--surface);

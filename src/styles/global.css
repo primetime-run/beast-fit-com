@@ -158,6 +158,20 @@
 
 html {
   scroll-padding-top: calc(var(--nav-h) + 1rem);
+
+  /* Nothing may pan the page sideways. On a phone a few stray pixels of
+     horizontal overflow turn into a page that slides under the thumb, which
+     reads as broken even when nothing is actually cut off.
+
+     `clip` and not `hidden`. `hidden` makes the root a scroll container, and
+     that silently breaks two things already relied on here: `position: sticky`
+     on the masthead, and the scroll-padding-top directly above. `clip`
+     suppresses the scrolling without creating the container.
+
+     Treat this as a backstop, not a fix. Anything wide enough to reach it is
+     still a bug to correct at the element, because clipped content is
+     unreachable — on the calendar that would be a day nobody can read. */
+  overflow-x: clip;
 }
 
 /* A column the height of the viewport, so a short page still pushes the

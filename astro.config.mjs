@@ -8,13 +8,15 @@ export default defineConfig({
       /* Everything under /checkout/ is machinery, not content: the payment
          test, the receipt page and the iframe communicator. They already send
          noindex, but a page listed in the sitemap and then refused is a
-         Search Console error every crawl, so keep them out of both. */
-      filter: (page) => {
-        const p = new URL(page).pathname
-        // Both are noindex. A page listed in the sitemap and then refused is a
-        // Search Console error on every crawl.
-        return !p.startsWith('/checkout/') && p !== '/waiver/'
-      },
+         Search Console error every crawl, so keep them out of both.
+
+         /waiver/ used to be excluded here for the same reason. It is now a
+         normal indexable page — linked from the nav, no private data on it,
+         and people do search for a gym's waiver by name — so it sends no
+         robots meta and belongs in the sitemap. The two have to move together:
+         listing it while it still refused indexing would create exactly the
+         crawl error this filter exists to prevent. */
+      filter: (page) => !new URL(page).pathname.startsWith('/checkout/'),
     }),
   ],
 

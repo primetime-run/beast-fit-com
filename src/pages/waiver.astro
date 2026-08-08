@@ -21,7 +21,6 @@ const ENDPOINT = import.meta.env.PUBLIC_WAIVER_ENDPOINT ?? ''
 <Base
   title="Waiver — BEAST Fitness"
   description="Release and waiver of liability for classes and personal training at BEAST Fitness, Delray Beach."
-  noindex
   width="prose"
 >
   <h1 class="brand-title page-title">{waiver.title}</h1>
@@ -457,7 +456,20 @@ const ENDPOINT = import.meta.env.PUBLIC_WAIVER_ENDPOINT ?? ''
 </script>
 
 <style>
-  .page-title { font-size: clamp(1.9rem, 5vw, 2.6rem); text-transform: uppercase; }
+  /* The longest title on the site — "Release, Indemnification and Hold
+     Harmless Agreement..." — and it is the attorney's wording, so it shrinks
+     rather than gets shortened. The old 1.9rem floor put "INDEMNIFICATION" at
+     roughly 273px in uppercase Black Ops One, against about 248px of usable
+     width on a 320px phone: the single word could not fit its line and pushed
+     the page sideways. 1.35rem clears it with room to spare.
+
+     Desktop is untouched — the 5vw term still reaches the 2.6rem ceiling. Only
+     the small end moves. break-word is the seatbelt for anything narrower. */
+  .page-title {
+    font-size: clamp(1.35rem, 5vw, 2.6rem);
+    text-transform: uppercase;
+    overflow-wrap: break-word;
+  }
   .lede { color: var(--text-muted); }
 
 
@@ -478,7 +490,9 @@ const ENDPOINT = import.meta.env.PUBLIC_WAIVER_ENDPOINT ?? ''
   form { max-width: 40rem; margin-top: 2.5rem; }
   .sub { font-size: 1rem; text-transform: uppercase; margin: 2rem 0 1rem; }
 
-  .row { display: grid; gap: 1rem; grid-template-columns: 1fr 1fr; }
+  /* minmax(0,1fr): an input carries an intrinsic minimum width of its own, and
+     a bare 1fr would honour it over the available space. */
+  .row { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   @media (max-width: 34rem) { .row { grid-template-columns: 1fr; } }
 
   label { display: block; margin-bottom: 1rem; font-size: .9375rem; font-weight: 600; }

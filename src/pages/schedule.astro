@@ -451,7 +451,7 @@ const jsonLd = {
   .day li { border-top: 1px solid var(--hairline); }
   .day li:first-child { border-top: 0; }
   .sess {
-    display: grid; grid-template-columns: auto 1fr auto; gap: .6rem;
+    display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .6rem;
     align-items: baseline; padding: .45rem .35rem; text-decoration: none;
     color: var(--text); border-radius: 3px;
   }
@@ -471,9 +471,18 @@ const jsonLd = {
   .monthnav button:disabled { opacity: .3; cursor: default; }
 
   .month h2 { font-size: 1.25rem; color: var(--link); }
-  .grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; background: var(--hairline); border: 1px solid var(--hairline); }
+  /* minmax(0,1fr) and not a bare 1fr. `1fr` is minmax(auto,1fr), and that auto
+     floor is the min-content width of the widest cell — "CLOSED" at .7rem bold
+     is about 48px, so seven of those plus padding demanded ~400px of a phone
+     that only had ~330px to give. The grid grew past the viewport and the page
+     panned sideways. A zero floor lets the columns actually divide the space. */
+  .grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; background: var(--hairline); border: 1px solid var(--hairline); }
   .dow { background: var(--bg); padding: .4rem; text-align: center; font-family: var(--display); font-weight: 700; font-size: .75rem; color: var(--text-muted); }
-  .cell { background: var(--surface); min-height: 6rem; padding: .35rem; display: flex; flex-direction: column; gap: .1rem; }
+  /* Once the columns can shrink, the text inside has to be able to follow.
+     `anywhere` rather than `break-word` because it lowers the min-content
+     contribution to a single character — so a long class name can never push
+     a column wide again, whatever gets added to the schedule later. */
+  .cell { background: var(--surface); min-height: 6rem; padding: .35rem; display: flex; flex-direction: column; gap: .1rem; min-width: 0; overflow-wrap: anywhere; }
   .cell.empty { background: var(--surface-2); min-height: 0; }
   .cell.is-closed { background: var(--cell-closed); }
   .cell.is-special { background: var(--cell-special); }
@@ -535,7 +544,7 @@ const jsonLd = {
 
        The grid's children are the seven day headings followed by the cells,
        so nth-child(7n+1) is the Sunday column in both. */
-    .grid { grid-template-columns: 2rem repeat(6, 1fr); }
+    .grid { grid-template-columns: 2rem repeat(6, minmax(0, 1fr)); }
 
     .grid > :nth-child(7n + 1) {
       padding-inline: .15rem;
@@ -592,6 +601,14 @@ const jsonLd = {
   @media (max-width: 30rem) {
     .week { grid-template-columns: 1fr; }
     .day h3 { flex-direction: row; align-items: baseline; justify-content: space-between; }
+
+    /* The 12rem floor on the label is there so the arrows do not jump around
+       as "May" becomes "September". It costs 192px, and with two 36px buttons
+       and the gaps that is more than a 320px phone has — so the nav overflowed
+       on the narrowest devices. flex:1 buys the same stability more cheaply:
+       the label absorbs whatever is left, so the arrows stay pinned to the
+       edges no matter how long the month is, and nothing can overflow. */
+    .monthnav strong { min-width: 0; flex: 1; }
   }
 
   /* --- desktop week: seven columns ---------------------------------------
